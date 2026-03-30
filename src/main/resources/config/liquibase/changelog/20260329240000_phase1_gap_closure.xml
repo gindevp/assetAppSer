@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260329240000-1" author="app">
+        <addColumn tableName="equipment">
+            <column name="model_name" type="varchar(150)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="brand_name" type="varchar(150)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="repair_request">
+            <column name="attachment_note" type="varchar(2000)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260329240000-2" author="app">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM jhi_authority WHERE name = 'ROLE_GD'</sqlCheck>
+        </preConditions>
+        <insert tableName="jhi_authority">
+            <column name="name" value="ROLE_GD"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>

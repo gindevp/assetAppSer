@@ -1,0 +1,60 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142654"
+  },
+  "applications": ["assetAppSer"],
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "lineNo",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "lineType",
+      "fieldType": "AssetManagementType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "DEVICE,CONSUMABLE"
+    },
+    {
+      "documentation": "Vật tư: số lượng; Thiết bị: có thể 1 và chọn dòng thiết bị",
+      "fieldName": "quantity",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    }
+  ],
+  "name": "AllocationRequestLine",
+  "relationships": [
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "allocationRequest",
+      "relationshipName": "request",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetItem",
+      "relationshipName": "assetItem",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetLine",
+      "relationshipName": "assetLine",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

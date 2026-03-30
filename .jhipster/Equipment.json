@@ -1,0 +1,84 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142647"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Thiết bị — mỗi chiếc một bản ghi, equipment_code duy nhất (vd EQ000001).\\nKhấu hao đường thẳng: nguyên giá, ngày vốn hóa, số tháng, giá trị thu hồi cuối kỳ.",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "equipmentCode",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "serial",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "100"
+    },
+    {
+      "fieldName": "conditionNote",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "EquipmentOperationalStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "IN_STOCK,IN_USE,PENDING_ISSUE,PENDING_RETURN,UNDER_REPAIR,BROKEN,LOST,DISPOSED"
+    },
+    {
+      "fieldName": "purchasePrice",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "capitalizationDate",
+      "fieldType": "LocalDate"
+    },
+    {
+      "fieldName": "depreciationMonths",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "salvageValue",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "documentation": "Giá trị còn lại có thể tính server-side; lưu snapshot nếu cần báo cáo",
+      "fieldName": "bookValueSnapshot",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "Equipment",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetItem",
+      "relationshipName": "assetItem",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "supplier",
+      "relationshipName": "supplier",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

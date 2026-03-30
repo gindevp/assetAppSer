@@ -1,0 +1,37 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142639"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Loại tài sản: Thiết bị / Vật tư (theo tài liệu)",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "maxlength"],
+      "fieldValidateRulesMaxlength": "150"
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "active",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "AssetType",
+  "relationships": [],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

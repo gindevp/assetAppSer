@@ -1,0 +1,40 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142648"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Tồn kho vật tư theo master — không tách từng cái",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "quantityOnHand",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "quantityIssued",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    }
+  ],
+  "name": "ConsumableStock",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetItem",
+      "relationshipName": "assetItem",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

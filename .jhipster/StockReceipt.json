@@ -1,0 +1,45 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142649"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Phiếu nhập kho",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "receiptDate",
+      "fieldType": "LocalDate",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "source",
+      "fieldType": "StockReceiptSource",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "NEW_PURCHASE,RECOVERY,MANUAL_ADJUSTMENT"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "DocumentStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "DRAFT,CONFIRMED,CANCELLED"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "2000"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "StockReceipt",
+  "pagination": "pagination",
+  "relationships": [],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

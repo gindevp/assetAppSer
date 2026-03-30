@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity AllocationRequestLine.
+    -->
+    <changeSet id="20260328142654-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="request_id"
+                                 baseTableName="allocation_request_line"
+                                 constraintName="fk_allocation_request_line__request_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="allocation_request"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="asset_item_id"
+                                 baseTableName="allocation_request_line"
+                                 constraintName="fk_allocation_request_line__asset_item_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="asset_item"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="asset_line_id"
+                                 baseTableName="allocation_request_line"
+                                 constraintName="fk_allocation_request_line__asset_line_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="asset_line"
+                                 />
+    </changeSet>
+</databaseChangeLog>

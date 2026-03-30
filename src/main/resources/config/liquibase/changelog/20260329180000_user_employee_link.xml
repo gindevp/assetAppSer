@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260329180000-1" author="asset-app">
+        <addColumn tableName="jhi_user">
+            <column name="employee_id" type="bigint" remarks="Liên kết tài khoản đăng nhập với nhân viên master (HRM)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260329180000-2" author="asset-app">
+        <addForeignKeyConstraint baseColumnNames="employee_id"
+                                 baseTableName="jhi_user"
+                                 constraintName="fk_jhi_user_employee_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="employee"/>
+    </changeSet>
+
+    <changeSet id="20260329180000-3" author="asset-app">
+        <comment>Gán user mẫu id=2 (nhân viên) với employee id=1 nếu tồn tại</comment>
+        <sql>UPDATE jhi_user SET employee_id = 1 WHERE id = 2 AND EXISTS (SELECT 1 FROM employee WHERE id = 1);</sql>
+    </changeSet>
+</databaseChangeLog>

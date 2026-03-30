@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260329210000-1" author="app">
+        <addColumn tableName="stock_issue">
+            <column name="allocation_request_id" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addUniqueConstraint
+            tableName="stock_issue"
+            columnNames="allocation_request_id"
+            constraintName="ux_stock_issue__allocation_request_id"
+        />
+        <addForeignKeyConstraint
+            baseTableName="stock_issue"
+            baseColumnNames="allocation_request_id"
+            constraintName="fk_stock_issue__allocation_request_id"
+            referencedTableName="allocation_request"
+            referencedColumnNames="id"
+        />
+    </changeSet>
+</databaseChangeLog>

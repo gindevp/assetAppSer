@@ -1,0 +1,53 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142650"
+  },
+  "applications": ["assetAppSer"],
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "lineNo",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "documentation": "Với thiết bị: số lượng = số bản ghi Equipment tạo ra; với vật tư: cộng tồn",
+      "fieldName": "quantity",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "unitPrice",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    }
+  ],
+  "name": "StockReceiptLine",
+  "relationships": [
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "stockReceipt",
+      "relationshipName": "receipt",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetItem",
+      "relationshipName": "assetItem",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

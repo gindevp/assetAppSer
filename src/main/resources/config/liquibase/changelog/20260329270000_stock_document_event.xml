@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="20260329270000-1" author="asset-app">
+        <createTable tableName="stock_document_event" remarks="Lịch sử thao tác trên phiếu nhập/xuất">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="occurred_at" type="datetime(6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="login" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="doc_type" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="doc_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="action" type="varchar(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="summary" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="detail" type="varchar(2000)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        <createIndex indexName="idx_stock_document_event_doc" tableName="stock_document_event">
+            <column name="doc_type"/>
+            <column name="doc_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

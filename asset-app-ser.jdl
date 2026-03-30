@@ -1,0 +1,331 @@
+// JHipster JDL — Hệ thống quản lý tài sản nội bộ (Phase 1)
+// Theo spec: thiết bị theo từng chiếc (equipment_code), vật tư theo số lượng;
+// cấp phát cho NHÂN VIÊN / PHÒNG BAN / VỊ TRÍ (công ty);
+// trạng thái thiết bị: IN_STOCK, IN_USE, PENDING_ISSUE, PENDING_RETURN, UNDER_REPAIR, BROKEN, LOST, DISPOSED.
+//
+// Chạy: jhipster jdl asset-app-ser.jdl
+// Frontend React tách riêng — chỉ sinh backend API (skipClient).
+// Ghi chú: Nhân viên/Phòng ban có thể thay bằng tích hợp HR sau — entity mock tối thiểu để bind UI/API.
+
+application {
+  config {
+    baseName assetAppSer
+    applicationType monolith
+    packageName com.gindevp.app
+    authenticationType jwt
+    buildTool maven
+    databaseType sql
+    devDatabaseType postgresql
+    prodDatabaseType postgresql
+    enableSwaggerCodegen true
+    skipClient true
+    nativeLanguage vi
+    languages [vi, en]
+  }
+  entities *
+}
+
+enum AssetManagementType {
+  DEVICE,
+  CONSUMABLE
+}
+
+enum EquipmentOperationalStatus {
+  IN_STOCK,
+  IN_USE,
+  PENDING_ISSUE,
+  PENDING_RETURN,
+  UNDER_REPAIR,
+  BROKEN,
+  LOST,
+  DISPOSED
+}
+
+enum StockReceiptSource {
+  NEW_PURCHASE,
+  RECOVERY,
+  MANUAL_ADJUSTMENT
+}
+
+enum DocumentStatus {
+  DRAFT,
+  CONFIRMED,
+  CANCELLED
+}
+
+enum AssigneeType {
+  EMPLOYEE,
+  DEPARTMENT,
+  LOCATION
+}
+
+enum AllocationRequestStatus {
+  PENDING,
+  APPROVED,
+  REJECTED,
+  EXPORT_SLIP_CREATED,
+  COMPLETED,
+  CANCELLED
+}
+
+enum RepairRequestStatus {
+  NEW,
+  ACCEPTED,
+  IN_PROGRESS,
+  COMPLETED,
+  REJECTED
+}
+
+enum ReturnRequestStatus {
+  PENDING,
+  APPROVED,
+  REJECTED,
+  COMPLETED,
+  CANCELLED
+}
+
+/** Loại tài sản: Thiết bị / Vật tư (theo tài liệu) */
+entity AssetType {
+  code String required unique maxlength(20)
+  name String required maxlength(150)
+  description String maxlength(500)
+  active Boolean required
+}
+
+/** Nhóm tài sản: CNTT, Văn phòng, ... */
+entity AssetGroup {
+  code String required unique maxlength(20)
+  name String required maxlength(150)
+  description String maxlength(500)
+  active Boolean required
+}
+
+/** Dòng tài sản: Laptop Dell, Màn hình 24 inch, ... */
+entity AssetLine {
+  code String required unique maxlength(20)
+  name String required maxlength(255)
+  description String maxlength(500)
+  active Boolean required
+}
+
+/**
+ * Master tài sản (item): mã TSxxxxxx, tên, loại quản lý thiết bị/vật tư, ĐVT,
+ * thiết bị: có khấu hao & serial.
+ */
+entity AssetItem {
+  code String required unique maxlength(20)
+  name String required maxlength(255)
+  managementType AssetManagementType required
+  unit String maxlength(20)
+  /** Thiết bị: bật khấu hao/serial theo nghiệp vụ */
+  depreciationEnabled Boolean required
+  serialTrackingRequired Boolean required
+  note String maxlength(2000)
+  active Boolean required
+}
+
+/** Nhà cung cấp — mã NCCxxxxxx */
+entity Supplier {
+  code String required unique maxlength(20)
+  name String required maxlength(255)
+  taxCode String maxlength(50)
+  phone String maxlength(30)
+  email String maxlength(100)
+  address String maxlength(500)
+  active Boolean required
+}
+
+/** DB ảo — đồng bộ HR sau */
+entity Department {
+  code String required unique maxlength(20)
+  name String required maxlength(255)
+  active Boolean required
+}
+
+/** DB ảo — đồng bộ HR sau */
+entity Employee {
+  code String required unique maxlength(20)
+  fullName String required maxlength(255)
+  jobTitle String maxlength(150)
+  active Boolean required
+}
+
+/** Vị trí / khu vực sử dụng */
+entity Location {
+  code String required unique maxlength(20)
+  name String required maxlength(255)
+  description String maxlength(500)
+  active Boolean required
+}
+
+/**
+ * Thiết bị — mỗi chiếc một bản ghi, equipment_code duy nhất (vd EQ000001).
+ * Khấu hao đường thẳng: nguyên giá, ngày vốn hóa, số tháng, giá trị thu hồi cuối kỳ.
+ */
+entity Equipment {
+  equipmentCode String required unique maxlength(20)
+  serial String maxlength(100)
+  conditionNote String maxlength(500)
+  status EquipmentOperationalStatus required
+  purchasePrice BigDecimal min(0)
+  capitalizationDate LocalDate
+  depreciationMonths Integer min(0)
+  salvageValue BigDecimal min(0)
+  /** Giá trị còn lại có thể tính server-side; lưu snapshot nếu cần báo cáo */
+  bookValueSnapshot BigDecimal min(0)
+}
+
+/** Tồn kho vật tư theo master — không tách từng cái */
+entity ConsumableStock {
+  quantityOnHand Integer required min(0)
+  quantityIssued Integer required min(0)
+  note String maxlength(500)
+}
+
+/** Phiếu nhập kho */
+entity StockReceipt {
+  code String required unique maxlength(20)
+  receiptDate LocalDate required
+  source StockReceiptSource required
+  status DocumentStatus required
+  note String maxlength(2000)
+}
+
+entity StockReceiptLine {
+  lineNo Integer required min(1)
+  /** Với thiết bị: số lượng = số bản ghi Equipment tạo ra; với vật tư: cộng tồn */
+  quantity Integer required min(1)
+  unitPrice BigDecimal min(0)
+  note String maxlength(500)
+}
+
+/** Phiếu xuất / cấp phát */
+entity StockIssue {
+  code String required unique maxlength(20)
+  issueDate LocalDate required
+  status DocumentStatus required
+  assigneeType AssigneeType required
+  note String maxlength(2000)
+}
+
+entity StockIssueLine {
+  lineNo Integer required min(1)
+  /** Vật tư: số lượng xuất; Thiết bị: 1 và bắt buộc equipment */
+  quantity Integer required min(1)
+  note String maxlength(500)
+}
+
+/** Yêu cầu cấp phát */
+entity AllocationRequest {
+  code String required unique maxlength(20)
+  requestDate Instant required
+  reason String maxlength(2000)
+  status AllocationRequestStatus required
+  /** Đối tượng nhận (người khác / phòng / vị trí) — bind theo assigneeType */
+  beneficiaryNote String maxlength(500)
+}
+
+entity AllocationRequestLine {
+  lineNo Integer required min(1)
+  lineType AssetManagementType required
+  /** Vật tư: số lượng; Thiết bị: có thể 1 và chọn dòng thiết bị */
+  quantity Integer min(1)
+  note String maxlength(500)
+}
+
+/** Yêu cầu sửa chữa — gắn 1 thiết bị (Phase 1 đơn giản) */
+entity RepairRequest {
+  code String required unique maxlength(20)
+  requestDate Instant required
+  problemCategory String maxlength(100)
+  description String maxlength(2000)
+  status RepairRequestStatus required
+  resolutionNote String maxlength(2000)
+}
+
+/** Yêu cầu thu hồi */
+entity ReturnRequest {
+  code String required unique maxlength(20)
+  requestDate Instant required
+  note String maxlength(2000)
+  status ReturnRequestStatus required
+}
+
+entity ReturnRequestLine {
+  lineNo Integer required min(1)
+  lineType AssetManagementType required
+  quantity Integer min(1)
+  selected Boolean required
+  note String maxlength(500)
+}
+
+/** Gán hiện tại: thiết bị đang ở ai/đâu */
+entity EquipmentAssignment {
+  assignedDate LocalDate required
+  returnedDate LocalDate
+  note String maxlength(1000)
+}
+
+/** Gán vật tư theo số lượng */
+entity ConsumableAssignment {
+  quantity Integer required min(1)
+  assignedDate LocalDate required
+  returnedQuantity Integer min(0)
+  note String maxlength(1000)
+}
+
+relationship ManyToOne {
+  AssetGroup{assetType(name)} to AssetType
+  AssetLine{assetGroup(name)} to AssetGroup
+  AssetItem{assetLine(name)} to AssetLine
+
+  ConsumableStock{assetItem(name)} to AssetItem
+
+  Equipment{assetItem(name)} to AssetItem
+  Equipment{supplier(name)} to Supplier
+
+  StockReceiptLine{receipt(code)} to StockReceipt
+  StockReceiptLine{assetItem(name)} to AssetItem
+
+  StockIssue{issue(code)} to StockIssue
+  /** nullable: chỉ khi assigneeType = EMPLOYEE */
+  StockIssue{employee(fullName)} to Employee
+  StockIssue{department(name)} to Department
+  StockIssue{location(name)} to Location
+
+  StockIssueLine{issue(code)} to StockIssue
+  StockIssueLine{assetItem(name)} to AssetItem
+  StockIssueLine{equipment(equipmentCode)} to Equipment
+
+  AllocationRequest{requester(fullName)} to Employee
+  AllocationRequestLine{request(code)} to AllocationRequest
+  AllocationRequestLine{assetItem(name)} to AssetItem
+  AllocationRequestLine{assetLine(name)} to AssetLine
+
+  RepairRequest{requester(fullName)} to Employee
+  RepairRequest{equipment(equipmentCode)} to Equipment
+
+  ReturnRequest{requester(fullName)} to Employee
+  ReturnRequestLine{request(code)} to ReturnRequest
+  ReturnRequestLine{assetItem(name)} to AssetItem
+  ReturnRequestLine{equipment(equipmentCode)} to Equipment
+
+  EquipmentAssignment{equipment(equipmentCode)} to Equipment
+  EquipmentAssignment{employee(fullName)} to Employee
+  EquipmentAssignment{department(name)} to Department
+  EquipmentAssignment{location(name)} to Location
+
+  ConsumableAssignment{assetItem(name)} to AssetItem
+  ConsumableAssignment{employee(fullName)} to Employee
+  ConsumableAssignment{department(name)} to Department
+  ConsumableAssignment{location(name)} to Location
+
+  Employee{department(name)} to Department
+}
+
+paginate AssetItem, Equipment, StockReceipt, StockIssue, AllocationRequest, RepairRequest, ReturnRequest, Supplier with pagination
+paginate Employee, Department, Location with pagination
+
+service * with serviceClass
+dto * with mapstruct
+filter AssetItem, Equipment, StockReceipt, StockIssue, AllocationRequest, RepairRequest, ReturnRequest

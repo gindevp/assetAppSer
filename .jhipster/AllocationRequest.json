@@ -1,0 +1,54 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142653"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Yêu cầu cấp phát",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "requestDate",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "reason",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "2000"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "AllocationRequestStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PENDING,APPROVED,REJECTED,EXPORT_SLIP_CREATED,COMPLETED,CANCELLED"
+    },
+    {
+      "documentation": "Đối tượng nhận (người khác / phòng / vị trí) — bind theo assigneeType",
+      "fieldName": "beneficiaryNote",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "AllocationRequest",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "fullName",
+      "otherEntityName": "employee",
+      "relationshipName": "requester",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

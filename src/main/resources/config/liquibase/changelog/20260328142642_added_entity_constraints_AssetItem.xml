@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity AssetItem.
+    -->
+    <changeSet id="20260328142642-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="asset_line_id"
+                                 baseTableName="asset_item"
+                                 constraintName="fk_asset_item__asset_line_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="asset_line"
+                                 />
+    </changeSet>
+</databaseChangeLog>

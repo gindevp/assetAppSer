@@ -1,0 +1,45 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142641"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Dòng tài sản: Laptop Dell, Màn hình 24 inch, ...",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "maxlength"],
+      "fieldValidateRulesMaxlength": "255"
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "active",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "AssetLine",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetGroup",
+      "relationshipName": "assetGroup",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

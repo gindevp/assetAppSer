@@ -1,0 +1,75 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142651"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Phiếu xuất / cấp phát",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "issueDate",
+      "fieldType": "LocalDate",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "DocumentStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "DRAFT,CONFIRMED,CANCELLED"
+    },
+    {
+      "fieldName": "assigneeType",
+      "fieldType": "AssigneeType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "EMPLOYEE,DEPARTMENT,LOCATION"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "2000"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "StockIssue",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "stockIssue",
+      "relationshipName": "issue",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "documentation": "nullable: chỉ khi assigneeType = EMPLOYEE",
+      "otherEntityField": "fullName",
+      "otherEntityName": "employee",
+      "relationshipName": "employee",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "department",
+      "relationshipName": "department",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "location",
+      "relationshipName": "location",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

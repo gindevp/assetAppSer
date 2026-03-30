@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity EquipmentAssignment.
+    -->
+    <changeSet id="20260328142658-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="equipment_id"
+                                 baseTableName="equipment_assignment"
+                                 constraintName="fk_equipment_assignment__equipment_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="equipment"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="employee_id"
+                                 baseTableName="equipment_assignment"
+                                 constraintName="fk_equipment_assignment__employee_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="employee"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="department_id"
+                                 baseTableName="equipment_assignment"
+                                 constraintName="fk_equipment_assignment__department_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="department"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="location_id"
+                                 baseTableName="equipment_assignment"
+                                 constraintName="fk_equipment_assignment__location_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="location"
+                                 />
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,58 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142658"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Gán hiện tại: thiết bị đang ở ai/đâu",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "assignedDate",
+      "fieldType": "LocalDate",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "returnedDate",
+      "fieldType": "LocalDate"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "1000"
+    }
+  ],
+  "name": "EquipmentAssignment",
+  "relationships": [
+    {
+      "otherEntityField": "equipmentCode",
+      "otherEntityName": "equipment",
+      "relationshipName": "equipment",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "fullName",
+      "otherEntityName": "employee",
+      "relationshipName": "employee",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "department",
+      "relationshipName": "department",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "location",
+      "relationshipName": "location",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="20260329200000-1" author="app">
+        <addColumn tableName="allocation_request">
+            <column name="assignee_type" type="varchar(20)" defaultValue="EMPLOYEE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="allocation_request">
+            <column name="beneficiary_employee_id" type="bigint"/>
+        </addColumn>
+        <addColumn tableName="allocation_request">
+            <column name="beneficiary_department_id" type="bigint"/>
+        </addColumn>
+        <addColumn tableName="allocation_request">
+            <column name="beneficiary_location_id" type="bigint"/>
+        </addColumn>
+    </changeSet>
+    <changeSet id="20260329200000-2" author="app">
+        <sql>
+            UPDATE allocation_request SET assignee_type = 'EMPLOYEE' WHERE assignee_type IS NULL;
+            UPDATE allocation_request SET beneficiary_employee_id = requester_id
+            WHERE beneficiary_employee_id IS NULL AND requester_id IS NOT NULL;
+        </sql>
+    </changeSet>
+    <changeSet id="20260329200000-3" author="app">
+        <addForeignKeyConstraint baseColumnNames="beneficiary_employee_id"
+                                 baseTableName="allocation_request"
+                                 constraintName="fk_allocation_request_beneficiary_employee_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="employee"/>
+        <addForeignKeyConstraint baseColumnNames="beneficiary_department_id"
+                                 baseTableName="allocation_request"
+                                 constraintName="fk_allocation_request_beneficiary_department_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="department"/>
+        <addForeignKeyConstraint baseColumnNames="beneficiary_location_id"
+                                 baseTableName="allocation_request"
+                                 constraintName="fk_allocation_request_beneficiary_location_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="location"/>
+    </changeSet>
+</databaseChangeLog>

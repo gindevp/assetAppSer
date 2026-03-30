@@ -1,0 +1,54 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142652"
+  },
+  "applications": ["assetAppSer"],
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "lineNo",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "documentation": "Vật tư: số lượng xuất; Thiết bị: 1 và bắt buộc equipment",
+      "fieldName": "quantity",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    }
+  ],
+  "name": "StockIssueLine",
+  "relationships": [
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "stockIssue",
+      "relationshipName": "issue",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "assetItem",
+      "relationshipName": "assetItem",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "equipmentCode",
+      "otherEntityName": "equipment",
+      "relationshipName": "equipment",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260329120000-1" author="asset-app">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="stock_issue" columnName="issue_id"/>
+        </preConditions>
+        <dropForeignKeyConstraint baseTableName="stock_issue" constraintName="fk_stock_issue__issue_id"/>
+        <dropColumn tableName="stock_issue" columnName="issue_id"/>
+    </changeSet>
+
+    <changeSet id="20260329120000-2" author="asset-app">
+        <addColumn tableName="allocation_request_line">
+            <column name="equipment_id" type="bigint" remarks="Thiết bị chọn khi duyệt YC cấp phát">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260329120000-3" author="asset-app">
+        <addForeignKeyConstraint baseColumnNames="equipment_id"
+                                 baseTableName="allocation_request_line"
+                                 constraintName="fk_allocation_request_line_equipment_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="equipment"/>
+    </changeSet>
+
+    <changeSet id="20260329120000-4" author="asset-app">
+        <addColumn tableName="repair_request">
+            <column name="repair_outcome" type="varchar(50)" remarks="RETURN_USER | RETURN_STOCK | MARK_BROKEN sau sửa">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260329120000-5" author="asset-app">
+        <createTable tableName="app_audit_log">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="occurred_at" type="datetime(6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="login" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="http_method" type="varchar(10)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="uri_path" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="response_status" type="int">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="20260329120000-6" author="asset-app" dbms="mysql">
+        <sql>
+            INSERT IGNORE INTO jhi_authority (name) VALUES ('ROLE_ASSET_MANAGER');
+            INSERT IGNORE INTO jhi_authority (name) VALUES ('ROLE_DEPARTMENT_COORDINATOR');
+            INSERT IGNORE INTO jhi_authority (name) VALUES ('ROLE_EMPLOYEE');
+        </sql>
+        <sql>
+            INSERT IGNORE INTO jhi_user_authority (user_id, authority_name) VALUES (1, 'ROLE_ASSET_MANAGER');
+            INSERT IGNORE INTO jhi_user_authority (user_id, authority_name) VALUES (1, 'ROLE_DEPARTMENT_COORDINATOR');
+            INSERT IGNORE INTO jhi_user_authority (user_id, authority_name) VALUES (1, 'ROLE_EMPLOYEE');
+            INSERT IGNORE INTO jhi_user_authority (user_id, authority_name) VALUES (2, 'ROLE_EMPLOYEE');
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,66 @@
+{
+  "annotations": {
+    "changelogDate": "20260328142655"
+  },
+  "applications": ["assetAppSer"],
+  "documentation": "Yêu cầu sửa chữa — gắn 1 thiết bị (Phase 1 đơn giản)",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "maxlength"],
+      "fieldValidateRulesMaxlength": "20"
+    },
+    {
+      "fieldName": "requestDate",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "problemCategory",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "100"
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "2000"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "RepairRequestStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "NEW,ACCEPTED,IN_PROGRESS,COMPLETED,REJECTED"
+    },
+    {
+      "fieldName": "resolutionNote",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "2000"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "RepairRequest",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "fullName",
+      "otherEntityName": "employee",
+      "relationshipName": "requester",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "equipmentCode",
+      "otherEntityName": "equipment",
+      "relationshipName": "equipment",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}
