@@ -1,6 +1,7 @@
 package com.gindevp.app.service;
 
 import com.gindevp.app.domain.AssetItem;
+import com.gindevp.app.domain.enumeration.AssetManagementType;
 import com.gindevp.app.repository.AssetItemRepository;
 import com.gindevp.app.service.dto.AssetItemDTO;
 import com.gindevp.app.service.mapper.AssetItemMapper;
@@ -39,6 +40,7 @@ public class AssetItemService {
     public AssetItemDTO save(AssetItemDTO assetItemDTO) {
         LOG.debug("Request to save AssetItem : {}", assetItemDTO);
         AssetItem assetItem = assetItemMapper.toEntity(assetItemDTO);
+        normalizeDeviceFlags(assetItem);
         assetItem = assetItemRepository.save(assetItem);
         return assetItemMapper.toDto(assetItem);
     }
@@ -52,6 +54,7 @@ public class AssetItemService {
     public AssetItemDTO update(AssetItemDTO assetItemDTO) {
         LOG.debug("Request to update AssetItem : {}", assetItemDTO);
         AssetItem assetItem = assetItemMapper.toEntity(assetItemDTO);
+        normalizeDeviceFlags(assetItem);
         assetItem = assetItemRepository.save(assetItem);
         return assetItemMapper.toDto(assetItem);
     }
@@ -69,6 +72,7 @@ public class AssetItemService {
             .findById(assetItemDTO.getId())
             .map(existingAssetItem -> {
                 assetItemMapper.partialUpdate(existingAssetItem, assetItemDTO);
+                normalizeDeviceFlags(existingAssetItem);
 
                 return existingAssetItem;
             })
@@ -105,5 +109,25 @@ public class AssetItemService {
     public void delete(Long id) {
         LOG.debug("Request to delete AssetItem : {}", id);
         assetItemRepository.deleteById(id);
+    }
+
+    /**
+     * Nghiệp vụ:
+     * - Thiết bị (DEVICE): cho phép cấu hình khấu hao/serial theo từng item (mặc định true nếu chưa set).
+     * - Vật tư (CONSUMABLE): không dùng khấu hao/serial tracking ở cấp item.
+     */
+    private static void normalizeDeviceFlags(AssetItem item) {
+        if (item == null || item.getManagementType() == null) return;
+        if (item.getManagementType() == AssetManagementType.DEVICE) {
+            if (item.getDepreciationEnabled() == null) {
+                item.setDepreciationEnabled(true);
+            }
+            if (item.getSerialTrackingRequired() == null) {
+                item.setSerialTrackingRequired(true);
+            }
+        } else {
+            item.setDepreciationEnabled(false);
+            item.setSerialTrackingRequired(false);
+        }
     }
 }

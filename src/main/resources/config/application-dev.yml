@@ -45,6 +45,12 @@ spring:
   liquibase:
     # Remove 'faker' if you do not want the sample data to be loaded automatically
     contexts: dev, faker
+    clear-checksums: true
+  sql:
+    init:
+      mode: always
+      continue-on-error: true
+      schema-locations: classpath:config/sql/00_clear_liquibase_lock.sql
   mail:
     host: localhost
     port: 25
@@ -88,6 +94,11 @@ jhipster:
         token-validity-in-seconds-for-remember-me: 2592000
   mail: # specific JHipster mail property, for standard properties see MailProperties
     base-url: http://127.0.0.1:8080
+
+application:
+  liquibase:
+    # Run synchronously in dev to avoid partial schema during startup/restart
+    async-start: false
   logging:
     use-json-format: false # By default, logs are not in Json format
     logstash: # Forward logs to logstash over a socket, used by LoggingConfiguration
@@ -109,5 +120,6 @@ jhipster:
 # Cho phép FE dev (Vite) gọi REST không cần JWT — không bật trên production
 app:
   security:
-    # Bật false để API yêu cầu JWT; đăng nhập admin/admin hoặc user/user (FE /login).
-    api-permit-all: false
+    # true: dev local không cần JWT (tránh bảng trống khi quên đăng nhập). Production dùng profile prod + JWT.
+    # false: luôn cần đăng nhập /login trước (admin/admin).
+    api-permit-all: true

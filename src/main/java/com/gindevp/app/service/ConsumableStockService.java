@@ -87,8 +87,9 @@ public class ConsumableStockService {
     @Transactional(readOnly = true)
     public List<ConsumableStockDTO> findAll() {
         LOG.debug("Request to get all ConsumableStocks");
+        /** Join fetch assetItem — tránh lazy null / thiếu id khi serialize JSON cho FE ghép mã/tên vật tư */
         return consumableStockRepository
-            .findAll()
+            .findAllWithToOneRelationships()
             .stream()
             .map(consumableStockMapper::toDto)
             .collect(Collectors.toCollection(LinkedList::new));

@@ -17,6 +17,7 @@ public interface ConsumableStockMapper extends EntityMapper<ConsumableStockDTO, 
     @Named("assetItemName")
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
+    @Mapping(target = "code", source = "code")
     @Mapping(target = "name", source = "name")
     AssetItemDTO toDtoAssetItemName(AssetItem assetItem);
 }

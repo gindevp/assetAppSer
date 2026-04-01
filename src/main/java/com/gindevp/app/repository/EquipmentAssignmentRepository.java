@@ -28,18 +28,18 @@ public interface EquipmentAssignmentRepository extends JpaRepository<EquipmentAs
     }
 
     @Query(
-        value = "select equipmentAssignment from EquipmentAssignment equipmentAssignment left join fetch equipmentAssignment.equipment left join fetch equipmentAssignment.employee left join fetch equipmentAssignment.department left join fetch equipmentAssignment.location",
+        value = "select equipmentAssignment from EquipmentAssignment equipmentAssignment left join fetch equipmentAssignment.equipment left join fetch equipmentAssignment.employee employee left join fetch employee.department left join fetch employee.location left join fetch equipmentAssignment.department left join fetch equipmentAssignment.location",
         countQuery = "select count(equipmentAssignment) from EquipmentAssignment equipmentAssignment"
     )
     Page<EquipmentAssignment> findAllWithToOneRelationships(Pageable pageable);
 
     @Query(
-        "select equipmentAssignment from EquipmentAssignment equipmentAssignment left join fetch equipmentAssignment.equipment left join fetch equipmentAssignment.employee left join fetch equipmentAssignment.department left join fetch equipmentAssignment.location"
+        "select distinct equipmentAssignment from EquipmentAssignment equipmentAssignment left join fetch equipmentAssignment.equipment left join fetch equipmentAssignment.employee employee left join fetch employee.department left join fetch employee.location left join fetch equipmentAssignment.department left join fetch equipmentAssignment.location"
     )
     List<EquipmentAssignment> findAllWithToOneRelationships();
 
     @Query(
-        "select equipmentAssignment from EquipmentAssignment equipmentAssignment left join fetch equipmentAssignment.equipment left join fetch equipmentAssignment.employee left join fetch equipmentAssignment.department left join fetch equipmentAssignment.location where equipmentAssignment.id =:id"
+        "select equipmentAssignment from EquipmentAssignment equipmentAssignment left join fetch equipmentAssignment.equipment left join fetch equipmentAssignment.employee employee left join fetch employee.department left join fetch employee.location left join fetch equipmentAssignment.department left join fetch equipmentAssignment.location where equipmentAssignment.id =:id"
     )
     Optional<EquipmentAssignment> findOneWithToOneRelationships(@Param("id") Long id);
 }

@@ -3,6 +3,7 @@ package com.gindevp.app.service.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -33,6 +34,11 @@ public class SupplierDTO implements Serializable {
 
     @Size(max = 500)
     private String address;
+
+    @Size(max = 255)
+    private String contactPerson;
+
+    private Instant createdDate;
 
     @NotNull
     private Boolean active;
@@ -93,6 +99,22 @@ public class SupplierDTO implements Serializable {
         this.address = address;
     }
 
+    public String getContactPerson() {
+        return contactPerson;
+    }
+
+    public void setContactPerson(String contactPerson) {
+        this.contactPerson = contactPerson;
+    }
+
+    public Instant getCreatedDate() {
+        return createdDate;
+    }
+
+    public void setCreatedDate(Instant createdDate) {
+        this.createdDate = createdDate;
+    }
+
     public Boolean getActive() {
         return active;
     }
@@ -133,6 +155,8 @@ public class SupplierDTO implements Serializable {
             ", phone='" + getPhone() + "'" +
             ", email='" + getEmail() + "'" +
             ", address='" + getAddress() + "'" +
+            ", contactPerson='" + getContactPerson() + "'" +
+            ", createdDate='" + getCreatedDate() + "'" +
             ", active='" + getActive() + "'" +
             "}";
     }

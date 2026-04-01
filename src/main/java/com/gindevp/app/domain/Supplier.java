@@ -3,6 +3,7 @@ package com.gindevp.app.domain;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.time.Instant;
 
 /**
  * Nhà cung cấp — mã NCCxxxxxx
@@ -46,9 +47,23 @@ public class Supplier implements Serializable {
     @Column(name = "address", length = 500)
     private String address;
 
+    @Size(max = 255)
+    @Column(name = "contact_person", length = 255)
+    private String contactPerson;
+
+    @Column(name = "created_date")
+    private Instant createdDate;
+
     @NotNull
     @Column(name = "active", nullable = false)
     private Boolean active;
+
+    @PrePersist
+    public void prePersistSupplier() {
+        if (createdDate == null) {
+            createdDate = Instant.now();
+        }
+    }
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -143,6 +158,32 @@ public class Supplier implements Serializable {
         this.address = address;
     }
 
+    public String getContactPerson() {
+        return this.contactPerson;
+    }
+
+    public Supplier contactPerson(String contactPerson) {
+        this.setContactPerson(contactPerson);
+        return this;
+    }
+
+    public void setContactPerson(String contactPerson) {
+        this.contactPerson = contactPerson;
+    }
+
+    public Instant getCreatedDate() {
+        return this.createdDate;
+    }
+
+    public Supplier createdDate(Instant createdDate) {
+        this.setCreatedDate(createdDate);
+        return this;
+    }
+
+    public void setCreatedDate(Instant createdDate) {
+        this.createdDate = createdDate;
+    }
+
     public Boolean getActive() {
         return this.active;
     }
@@ -186,6 +227,8 @@ public class Supplier implements Serializable {
             ", phone='" + getPhone() + "'" +
             ", email='" + getEmail() + "'" +
             ", address='" + getAddress() + "'" +
+            ", contactPerson='" + getContactPerson() + "'" +
+            ", createdDate='" + getCreatedDate() + "'" +
             ", active='" + getActive() + "'" +
             "}";
     }

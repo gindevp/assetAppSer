@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.util.Objects;
+import com.gindevp.app.domain.enumeration.Asssettype;
 
 /**
  * A DTO for the {@link com.gindevp.app.domain.AssetGroup} entity.
@@ -28,7 +29,8 @@ public class AssetGroupDTO implements Serializable {
     @NotNull
     private Boolean active;
 
-    private AssetTypeDTO assetType;
+    @NotNull
+    private Asssettype assetType;
 
     public Long getId() {
         return id;
@@ -70,11 +72,11 @@ public class AssetGroupDTO implements Serializable {
         this.active = active;
     }
 
-    public AssetTypeDTO getAssetType() {
+    public Asssettype getAssetType() {
         return assetType;
     }
 
-    public void setAssetType(AssetTypeDTO assetType) {
+    public void setAssetType(Asssettype assetType) {
         this.assetType = assetType;
     }
 

@@ -91,7 +91,7 @@ public class EquipmentAssignmentService {
     public List<EquipmentAssignmentDTO> findAll() {
         LOG.debug("Request to get all EquipmentAssignments");
         return equipmentAssignmentRepository
-            .findAll()
+            .findAllWithToOneRelationships()
             .stream()
             .map(equipmentAssignmentMapper::toDto)
             .collect(Collectors.toCollection(LinkedList::new));

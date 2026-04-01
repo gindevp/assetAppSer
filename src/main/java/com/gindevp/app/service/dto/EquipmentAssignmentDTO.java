@@ -31,6 +31,9 @@ public class EquipmentAssignmentDTO implements Serializable {
 
     private LocationDTO location;
 
+    /** FK thiết bị — luôn map từ equipment.id để FE ghép chắc chắn (không phụ thuộc object equipment lồng nhau). */
+    private Long equipmentId;
+
     public Long getId() {
         return id;
     }
@@ -95,6 +98,14 @@ public class EquipmentAssignmentDTO implements Serializable {
         this.location = location;
     }
 
+    public Long getEquipmentId() {
+        return equipmentId;
+    }
+
+    public void setEquipmentId(Long equipmentId) {
+        this.equipmentId = equipmentId;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -128,6 +139,7 @@ public class EquipmentAssignmentDTO implements Serializable {
             ", employee=" + getEmployee() +
             ", department=" + getDepartment() +
             ", location=" + getLocation() +
+            ", equipmentId=" + getEquipmentId() +
             "}";
     }
 }

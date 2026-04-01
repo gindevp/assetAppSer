@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260401100000-1" author="app">
+        <addColumn tableName="supplier">
+            <column name="contact_person" type="varchar(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_date" type="${datetimeType}">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260401100000-2" author="app">
+        <comment>Gán ngày tạo cho bản ghi cũ (trước khi có cột)</comment>
+        <sql dbms="postgresql">UPDATE supplier SET created_date = CURRENT_TIMESTAMP WHERE created_date IS NULL</sql>
+        <sql dbms="mysql">UPDATE supplier SET created_date = NOW(6) WHERE created_date IS NULL</sql>
+        <sql dbms="h2">UPDATE supplier SET created_date = CURRENT_TIMESTAMP WHERE created_date IS NULL</sql>
+    </changeSet>
+</databaseChangeLog>

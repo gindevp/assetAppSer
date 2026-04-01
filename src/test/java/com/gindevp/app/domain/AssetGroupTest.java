@@ -1,9 +1,9 @@
 package com.gindevp.app.domain;
 
 import static com.gindevp.app.domain.AssetGroupTestSamples.*;
-import static com.gindevp.app.domain.AssetTypeTestSamples.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.gindevp.app.domain.enumeration.Asssettype;
 import com.gindevp.app.web.rest.TestUtil;
 import org.junit.jupiter.api.Test;
 
@@ -26,12 +26,12 @@ class AssetGroupTest {
     @Test
     void assetTypeTest() {
         AssetGroup assetGroup = getAssetGroupRandomSampleGenerator();
-        AssetType assetTypeBack = getAssetTypeRandomSampleGenerator();
+        Asssettype assetTypeBack = Asssettype.DEVICE;
 
         assetGroup.setAssetType(assetTypeBack);
         assertThat(assetGroup.getAssetType()).isEqualTo(assetTypeBack);
 
-        assetGroup.assetType(null);
-        assertThat(assetGroup.getAssetType()).isNull();
+        assetGroup.assetType(Asssettype.CONSUMABLE);
+        assertThat(assetGroup.getAssetType()).isEqualTo(Asssettype.CONSUMABLE);
     }
 }

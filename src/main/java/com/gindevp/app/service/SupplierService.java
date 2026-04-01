@@ -51,9 +51,11 @@ public class SupplierService {
      */
     public SupplierDTO update(SupplierDTO supplierDTO) {
         LOG.debug("Request to update Supplier : {}", supplierDTO);
-        Supplier supplier = supplierMapper.toEntity(supplierDTO);
-        supplier = supplierRepository.save(supplier);
-        return supplierMapper.toDto(supplier);
+        Supplier existing = supplierRepository
+            .findById(supplierDTO.getId())
+            .orElseThrow(() -> new IllegalStateException("Supplier not found: " + supplierDTO.getId()));
+        supplierMapper.partialUpdate(existing, supplierDTO);
+        return supplierMapper.toDto(supplierRepository.save(existing));
     }
 
     /**

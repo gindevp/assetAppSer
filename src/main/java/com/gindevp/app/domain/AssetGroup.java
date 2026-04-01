@@ -3,6 +3,7 @@ package com.gindevp.app.domain;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import com.gindevp.app.domain.enumeration.Asssettype;
 
 /**
  * Nhóm tài sản: CNTT, Văn phòng, ...
@@ -38,8 +39,10 @@ public class AssetGroup implements Serializable {
     @Column(name = "active", nullable = false)
     private Boolean active;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    private AssetType assetType;
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "asset_type", nullable = false)
+    private Asssettype assetType;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -108,15 +111,15 @@ public class AssetGroup implements Serializable {
         this.active = active;
     }
 
-    public AssetType getAssetType() {
+    public Asssettype getAssetType() {
         return this.assetType;
     }
 
-    public void setAssetType(AssetType assetType) {
+    public void setAssetType(Asssettype assetType) {
         this.assetType = assetType;
     }
 
-    public AssetGroup assetType(AssetType assetType) {
+    public AssetGroup assetType(Asssettype assetType) {
         this.setAssetType(assetType);
         return this;
     }

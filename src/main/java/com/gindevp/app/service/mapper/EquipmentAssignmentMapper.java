@@ -17,11 +17,17 @@ import org.mapstruct.*;
  */
 @Mapper(componentModel = "spring")
 public interface EquipmentAssignmentMapper extends EntityMapper<EquipmentAssignmentDTO, EquipmentAssignment> {
+    @Mapping(target = "equipmentId", source = "equipment.id")
     @Mapping(target = "equipment", source = "equipment", qualifiedByName = "equipmentEquipmentCode")
-    @Mapping(target = "employee", source = "employee", qualifiedByName = "employeeFullName")
+    /** Gồm phòng ban / vị trí của nhân viên — khi phiếu gán chỉ set employee, department trên assignment có thể null */
+    @Mapping(target = "employee", source = "employee", qualifiedByName = "employeeWithDeptLoc")
     @Mapping(target = "department", source = "department", qualifiedByName = "departmentName")
     @Mapping(target = "location", source = "location", qualifiedByName = "locationName")
     EquipmentAssignmentDTO toDto(EquipmentAssignment s);
+
+    @Override
+    @BeanMapping(ignoreUnmappedSourceProperties = { "equipmentId" })
+    EquipmentAssignment toEntity(EquipmentAssignmentDTO dto);
 
     @Named("equipmentEquipmentCode")
     @BeanMapping(ignoreByDefault = true)
@@ -29,11 +35,13 @@ public interface EquipmentAssignmentMapper extends EntityMapper<EquipmentAssignm
     @Mapping(target = "equipmentCode", source = "equipmentCode")
     EquipmentDTO toDtoEquipmentEquipmentCode(Equipment equipment);
 
-    @Named("employeeFullName")
+    @Named("employeeWithDeptLoc")
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "fullName", source = "fullName")
-    EmployeeDTO toDtoEmployeeFullName(Employee employee);
+    @Mapping(target = "department", source = "department", qualifiedByName = "departmentName")
+    @Mapping(target = "location", source = "location", qualifiedByName = "locationName")
+    EmployeeDTO toDtoEmployeeWithDeptLoc(Employee employee);
 
     @Named("departmentName")
     @BeanMapping(ignoreByDefault = true)

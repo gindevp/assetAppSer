@@ -9,12 +9,10 @@
         Added the constraints for entity AssetGroup.
     -->
     <changeSet id="20260328142640-2" author="jhipster">
-
         <addForeignKeyConstraint baseColumnNames="asset_type_id"
                                  baseTableName="asset_group"
                                  constraintName="fk_asset_group__asset_type_id"
                                  referencedColumnNames="id"
-                                 referencedTableName="asset_type"
-                                 />
+                                 referencedTableName="asset_type"/>
     </changeSet>
 </databaseChangeLog>

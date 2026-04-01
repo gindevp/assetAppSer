@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Đồng bộ sequence_generator cho MySQL trong trường hợp DB đã có dữ liệu (id đã tồn tại)
+      nhưng next_val vẫn ở giá trị thấp, gây lỗi trùng PK khi insert.
+    -->
+    <changeSet id="20260331171000-sequence-generator-sync" author="asset-app" runOnChange="true">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="sequence_generator"/>
+        </preConditions>
+
+        <sql dbms="mysql">
+            UPDATE sequence_generator
+            SET next_val = GREATEST(
+                next_val,
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM asset_group),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM asset_line),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM asset_item),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM supplier),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM department),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM employee),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM location),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM equipment),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM consumable_stock),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM stock_receipt),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM stock_receipt_line),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM stock_issue),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM stock_issue_line),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM allocation_request),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM allocation_request_line),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM repair_request),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM return_request),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM return_request_line),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM equipment_assignment),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM consumable_assignment),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM app_audit_log),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM stock_document_event),
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM jhi_user)
+            )
+            WHERE sequence_name = 'default';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
+

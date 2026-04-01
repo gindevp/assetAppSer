@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260331193000-asset-group-enum-type" author="asset-app">
+        <!-- MySQL: asset_group.asset_type_id -> asset_group.asset_type (enum as varchar) -->
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="asset_group"/>
+                <columnExists tableName="asset_group" columnName="asset_type_id"/>
+            </and>
+        </preConditions>
+
+        <dropForeignKeyConstraint baseTableName="asset_group" constraintName="fk_asset_group__asset_type_id"/>
+        <dropColumn tableName="asset_group" columnName="asset_type_id"/>
+
+        <addColumn tableName="asset_group">
+            <column name="asset_type" type="varchar(20)" defaultValue="DEVICE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>
+

@@ -65,6 +65,11 @@
     <include file="config/liquibase/changelog/20260329250000_employee_location.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260329260000_app_audit_log_detail.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260329270000_stock_document_event.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260331170000_sequence_generator_table.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260331171000_sequence_generator_sync.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260331193000_asset_group_enum_type.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260331194000_drop_asset_type_table.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260401100000_supplier_contact_created.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-constraints-changelog - JHipster will add liquibase constraints changelogs here -->
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>
