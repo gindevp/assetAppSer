@@ -41,16 +41,20 @@ public class UserService {
 
     private final EmployeeRepository employeeRepository;
 
+    private final MailService mailService;
+
     public UserService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
         AuthorityRepository authorityRepository,
-        EmployeeRepository employeeRepository
+        EmployeeRepository employeeRepository,
+        MailService mailService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authorityRepository = authorityRepository;
         this.employeeRepository = employeeRepository;
+        this.mailService = mailService;
     }
 
     public Optional<User> activateRegistration(String key) {
@@ -172,6 +176,9 @@ public class UserService {
         applyEmployeeLink(user, userDTO.getEmployeeId());
         userRepository.save(user);
         LOG.debug("Created Information for User: {}", user);
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            mailService.sendCreationEmail(user);
+        }
         return user;
     }
 

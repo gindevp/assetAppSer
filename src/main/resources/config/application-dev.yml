@@ -51,11 +51,20 @@ spring:
       mode: always
       continue-on-error: true
       schema-locations: classpath:config/sql/00_clear_liquibase_lock.sql
+  # Gmail: đặt biến môi trường (không commit mật khẩu). Thêm: SPRING_MAIL_SMTP_AUTH=true SPRING_MAIL_SMTP_STARTTLS=true
+  # Ví dụ: SPRING_MAIL_HOST=smtp.gmail.com SPRING_MAIL_PORT=587 SPRING_MAIL_USERNAME=...@gmail.com SPRING_MAIL_PASSWORD=app-password (16 ký tự, bỏ dấu cách)
   mail:
-    host: localhost
-    port: 25
-    username:
-    password:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:25}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS:false}
+            required: ${SPRING_MAIL_SMTP_STARTTLS:false}
   messages:
     cache-duration: PT1S # 1 second, see the ISO 8601 standard
   thymeleaf:
@@ -93,7 +102,9 @@ jhipster:
         token-validity-in-seconds: 86400
         token-validity-in-seconds-for-remember-me: 2592000
   mail: # specific JHipster mail property, for standard properties see MailProperties
-    base-url: http://127.0.0.1:8080
+    # URL gốc của SPA (link trong email: /account/reset/finish?key=...)
+    base-url: ${JHIPSTER_MAIL_BASE_URL:http://127.0.0.1:5173}
+    from: ${JHIPSTER_MAIL_FROM:${SPRING_MAIL_USERNAME:assetAppSer@localhost}}
 
 application:
   liquibase:
