@@ -229,5 +229,7 @@ application:
   upload:
     # Môi trường thật: nên dùng đường dẫn tuyệt đối trên ổ bảo mật; sao lưu/AV theo quy định.
     repair-directory: uploads/repair
+    allocation-directory: uploads/allocation
     # Ảnh/PDF + video ngắn (mp4/webm/mov) theo tài liệu Phase 1
     max-repair-attachment-bytes: 52428800
+    max-allocation-attachment-bytes: 52428800

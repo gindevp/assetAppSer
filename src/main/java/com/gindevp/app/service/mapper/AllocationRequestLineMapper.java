@@ -38,6 +38,7 @@ public interface AllocationRequestLineMapper extends EntityMapper<AllocationRequ
     @Named("assetLineName")
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
+    @Mapping(target = "code", source = "code")
     @Mapping(target = "name", source = "name")
     AssetLineDTO toDtoAssetLineName(AssetLine assetLine);
 

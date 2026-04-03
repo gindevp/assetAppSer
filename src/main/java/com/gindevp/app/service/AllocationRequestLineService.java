@@ -2,6 +2,7 @@ package com.gindevp.app.service;
 
 import com.gindevp.app.domain.AllocationRequestLine;
 import com.gindevp.app.domain.enumeration.AllocationRequestStatus;
+import com.gindevp.app.domain.enumeration.AssetManagementType;
 import com.gindevp.app.repository.AllocationRequestLineRepository;
 import com.gindevp.app.repository.AllocationRequestRepository;
 import com.gindevp.app.service.dto.AllocationRequestLineDTO;
@@ -67,6 +68,28 @@ public class AllocationRequestLineService {
         }
     }
 
+    private void assertLineReferences(AllocationRequestLine line) {
+        if (line.getLineType() == AssetManagementType.DEVICE) {
+            boolean hasLine = line.getAssetLine() != null && line.getAssetLine().getId() != null;
+            boolean hasItem = line.getAssetItem() != null && line.getAssetItem().getId() != null;
+            if (!hasLine && !hasItem) {
+                throw new BadRequestAlertException(
+                    "Dòng thiết bị phải chọn dòng tài sản (hoặc dữ liệu cũ: mã item)",
+                    ENTITY_NAME,
+                    "devicerequiresline"
+                );
+            }
+            if (hasLine) {
+                line.setAssetItem(null);
+            }
+        } else if (line.getLineType() == AssetManagementType.CONSUMABLE) {
+            if (line.getAssetItem() == null || line.getAssetItem().getId() == null) {
+                throw new BadRequestAlertException("Dòng vật tư phải chọn mã tài sản (item)", ENTITY_NAME, "consumablerequiresitem");
+            }
+            line.setAssetLine(null);
+        }
+    }
+
     /**
      * Save a allocationRequestLine.
      *
@@ -80,6 +103,7 @@ public class AllocationRequestLineService {
         }
         assertCanAddLineToRequest(allocationRequestLineDTO.getRequest().getId());
         AllocationRequestLine allocationRequestLine = allocationRequestLineMapper.toEntity(allocationRequestLineDTO);
+        assertLineReferences(allocationRequestLine);
         allocationRequestLine = allocationRequestLineRepository.save(allocationRequestLine);
         return allocationRequestLineMapper.toDto(allocationRequestLine);
     }
@@ -93,6 +117,7 @@ public class AllocationRequestLineService {
     public AllocationRequestLineDTO update(AllocationRequestLineDTO allocationRequestLineDTO) {
         LOG.debug("Request to update AllocationRequestLine : {}", allocationRequestLineDTO);
         AllocationRequestLine allocationRequestLine = allocationRequestLineMapper.toEntity(allocationRequestLineDTO);
+        assertLineReferences(allocationRequestLine);
         allocationRequestLine = allocationRequestLineRepository.save(allocationRequestLine);
         return allocationRequestLineMapper.toDto(allocationRequestLine);
     }

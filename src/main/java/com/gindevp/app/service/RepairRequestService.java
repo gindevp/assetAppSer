@@ -10,6 +10,7 @@ import com.gindevp.app.repository.EquipmentRepository;
 import com.gindevp.app.repository.RepairRequestRepository;
 import com.gindevp.app.service.dto.RepairRequestDTO;
 import com.gindevp.app.service.mapper.RepairRequestMapper;
+import com.gindevp.app.web.rest.errors.BadRequestAlertException;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -28,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RepairRequestService {
 
     private static final Logger LOG = LoggerFactory.getLogger(RepairRequestService.class);
+
+    private static final String ENTITY_NAME = "repairRequest";
 
     private final RepairRequestRepository repairRequestRepository;
 
@@ -96,7 +99,34 @@ public class RepairRequestService {
     public Optional<RepairRequestDTO> partialUpdate(RepairRequestDTO repairRequestDTO) {
         LOG.debug("Request to partially update RepairRequest : {}", repairRequestDTO);
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
-            throw new AccessDeniedException("Chỉ QLTS/Admin được cập nhật yêu cầu sửa chữa");
+            return repairRequestRepository
+                .findById(repairRequestDTO.getId())
+                .map(existingRepairRequest -> {
+                    Long eid = currentEmployeeService
+                        .currentEmployeeId()
+                        .orElseThrow(() -> new AccessDeniedException("Tài khoản chưa liên kết nhân viên"));
+                    if (
+                        existingRepairRequest.getRequester() == null ||
+                        !eid.equals(existingRepairRequest.getRequester().getId())
+                    ) {
+                        throw new AccessDeniedException("Không phải yêu cầu của bạn");
+                    }
+                    if (existingRepairRequest.getStatus() != RepairRequestStatus.NEW) {
+                        throw new BadRequestAlertException("Chỉ sửa khi trạng thái Mới", ENTITY_NAME, "notnew");
+                    }
+                    if (repairRequestDTO.getStatus() != null) {
+                        throw new AccessDeniedException("Không đổi trạng thái từ form sửa của nhân viên");
+                    }
+                    if (employeeRepairContentPatchHasForbiddenFields(repairRequestDTO)) {
+                        throw new AccessDeniedException("Chỉ được sửa vấn đề, mô tả, ghi chú đính kèm");
+                    }
+                    RepairRequestStatus old = existingRepairRequest.getStatus();
+                    repairRequestMapper.partialUpdate(existingRepairRequest, repairRequestDTO);
+                    RepairRequest saved = repairRequestRepository.save(existingRepairRequest);
+                    applyRepairLifecycle(old, saved);
+                    return saved;
+                })
+                .map(repairRequestMapper::toDto);
         }
 
         return repairRequestRepository
@@ -202,6 +232,29 @@ public class RepairRequestService {
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
             throw new AccessDeniedException("Chỉ QLTS/Admin được xóa yêu cầu sửa chữa");
         }
+        RepairRequest r = repairRequestRepository
+            .findById(id)
+            .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy yêu cầu sửa chữa", ENTITY_NAME, "notfound"));
+        RepairRequestStatus s = r.getStatus();
+        if (s != RepairRequestStatus.NEW && s != RepairRequestStatus.REJECTED) {
+            throw new BadRequestAlertException(
+                "Chỉ xóa yêu cầu ở trạng thái Mới hoặc Từ chối",
+                ENTITY_NAME,
+                "baddeletestatus"
+            );
+        }
         repairRequestRepository.deleteById(id);
+    }
+
+    private static boolean employeeRepairContentPatchHasForbiddenFields(RepairRequestDTO d) {
+        return (
+            d.getCode() != null ||
+            d.getRequestDate() != null ||
+            d.getRequester() != null ||
+            d.getEquipment() != null ||
+            d.getStatus() != null ||
+            d.getResolutionNote() != null ||
+            d.getRepairOutcome() != null
+        );
     }
 }

@@ -135,19 +135,35 @@ public class ReturnRequestService {
                     ) {
                         throw new AccessDeniedException("Không phải yêu cầu của bạn");
                     }
-                    if (returnRequestDTO.getStatus() != null && returnRequestDTO.getStatus() != ReturnRequestStatus.CANCELLED) {
-                        throw new AccessDeniedException("Chỉ được hủy yêu cầu (CANCELLED)");
-                    }
-                    if (
-                        returnRequestDTO.getNote() != null ||
-                        returnRequestDTO.getRequestDate() != null ||
-                        returnRequestDTO.getCode() != null ||
-                        returnRequestDTO.getRequester() != null
-                    ) {
-                        throw new AccessDeniedException("Chỉ được gửi id và status CANCELLED");
-                    }
-                    if (existingReturnRequest.getStatus() != ReturnRequestStatus.PENDING) {
-                        throw new BadRequestAlertException("Chỉ hủy khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                    if (returnRequestDTO.getStatus() != null) {
+                        if (returnRequestDTO.getStatus() != ReturnRequestStatus.CANCELLED) {
+                            throw new AccessDeniedException("Chỉ được hủy yêu cầu (CANCELLED)");
+                        }
+                        if (
+                            returnRequestDTO.getNote() != null ||
+                            returnRequestDTO.getRequestDate() != null ||
+                            returnRequestDTO.getCode() != null ||
+                            returnRequestDTO.getRequester() != null
+                        ) {
+                            throw new AccessDeniedException("Khi hủy chỉ gửi id và status CANCELLED");
+                        }
+                        if (existingReturnRequest.getStatus() != ReturnRequestStatus.PENDING) {
+                            throw new BadRequestAlertException("Chỉ hủy khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                        }
+                    } else {
+                        if (existingReturnRequest.getStatus() != ReturnRequestStatus.PENDING) {
+                            throw new BadRequestAlertException("Chỉ sửa ghi chú khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                        }
+                        if (returnRequestDTO.getNote() == null) {
+                            throw new AccessDeniedException("Gửi ghi chú (note) cần cập nhật");
+                        }
+                        if (
+                            returnRequestDTO.getCode() != null ||
+                            returnRequestDTO.getRequestDate() != null ||
+                            returnRequestDTO.getRequester() != null
+                        ) {
+                            throw new AccessDeniedException("Chỉ được sửa ghi chú (note)");
+                        }
                     }
                 }
                 ReturnRequestStatus oldStatus = existingReturnRequest.getStatus();
@@ -342,6 +358,22 @@ public class ReturnRequestService {
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
             throw new AccessDeniedException("Chỉ QLTS/Admin được xóa yêu cầu thu hồi");
         }
+        ReturnRequest rr = returnRequestRepository
+            .findOneWithEagerRelationships(id)
+            .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy yêu cầu thu hồi", ENTITY_NAME, "notfound"));
+        ReturnRequestStatus s = rr.getStatus();
+        if (
+            s != ReturnRequestStatus.PENDING &&
+            s != ReturnRequestStatus.REJECTED &&
+            s != ReturnRequestStatus.CANCELLED
+        ) {
+            throw new BadRequestAlertException(
+                "Chỉ xóa yêu cầu ở trạng thái chờ duyệt / từ chối / đã hủy",
+                ENTITY_NAME,
+                "baddeletestatus"
+            );
+        }
+        returnRequestLineRepository.deleteAll(returnRequestLineRepository.findAllByRequest_Id(id));
         returnRequestRepository.deleteById(id);
     }
 }

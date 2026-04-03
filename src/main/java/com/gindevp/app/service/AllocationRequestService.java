@@ -95,6 +95,25 @@ public class AllocationRequestService {
 
     private static final String ENTITY_NAME = "allocationRequest";
 
+    /**
+     * Bản ghi tồn kho vật tư theo master — nếu chưa có thì tạo 0/0 để trừ tồn nhất quán (tránh lỗi nostock khi chưa nhập kho đúng luồng).
+     */
+    private ConsumableStock getOrCreateConsumableStockForItem(Long assetItemId, AssetItem lineAssetItem) {
+        Optional<ConsumableStock> existing = consumableStockRepository.findFirstByAssetItem_Id(assetItemId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        AssetItem itemRef =
+            lineAssetItem != null && lineAssetItem.getId() != null ? lineAssetItem : new AssetItem().id(assetItemId);
+        ConsumableStock row = new ConsumableStock();
+        row.setQuantityOnHand(0);
+        row.setQuantityIssued(0);
+        row.setAssetItem(itemRef);
+        row.setNote("Khởi tạo khi hoàn thành cấp phát — trước đó chưa có bản ghi tồn kho");
+        LOG.info("Created consumable_stock for assetItemId {} (missing before allocation completion)", assetItemId);
+        return consumableStockRepository.save(row);
+    }
+
     private void validateDeviceLinesPickedIfApproving(AllocationRequest allocationRequest) {
         Long id = allocationRequest.getId();
         if (id == null) {
@@ -105,6 +124,43 @@ public class AllocationRequestService {
             return;
         }
         validateAllDeviceLinesHaveEquipment(id);
+        validateConsumableLinesSufficientStock(id);
+    }
+
+    /**
+     * Mỗi dòng vật tư có số lượng yêu cầu dương phải có bản ghi tồn kho và đủ quantity_on_hand — khi duyệt, ghi nhận phiếu xuất và trước khi hoàn thành.
+     */
+    private void validateConsumableLinesSufficientStock(Long allocationRequestId) {
+        for (AllocationRequestLine line : allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId)) {
+            if (line.getLineType() != AssetManagementType.CONSUMABLE) {
+                continue;
+            }
+            if (line.getAssetItem() == null || line.getAssetItem().getId() == null) {
+                continue;
+            }
+            int qty = line.getQuantity() != null ? line.getQuantity() : 0;
+            if (qty <= 0) {
+                continue;
+            }
+            Long itemId = line.getAssetItem().getId();
+            ConsumableStock stock = consumableStockRepository
+                .findFirstByAssetItem_Id(itemId)
+                .orElseThrow(() ->
+                    new BadRequestAlertException(
+                        "Dòng vật tư chưa có tồn kho trong hệ thống — nhập kho mã vật tư này trước khi duyệt",
+                        ENTITY_NAME,
+                        "nostock"
+                    )
+                );
+            int onHand = stock.getQuantityOnHand() != null ? stock.getQuantityOnHand() : 0;
+            if (onHand < qty) {
+                throw new BadRequestAlertException(
+                    "Không đủ tồn kho vật tư để duyệt (cần " + qty + ", hiện " + onHand + ")",
+                    ENTITY_NAME,
+                    "insufficientstock"
+                );
+            }
+        }
     }
 
     private void validateAllDeviceLinesHaveEquipment(Long allocationRequestId) {
@@ -153,6 +209,7 @@ public class AllocationRequestService {
             );
         }
         validateAllDeviceLinesHaveEquipment(requestId);
+        validateConsumableLinesSufficientStock(requestId);
     }
 
     private void defaultAssigneeFields(AllocationRequest ar) {
@@ -344,11 +401,7 @@ public class AllocationRequestService {
                     continue;
                 }
                 Long itemId = line.getAssetItem().getId();
-                ConsumableStock stock = consumableStockRepository
-                    .findFirstByAssetItem_Id(itemId)
-                    .orElseThrow(() ->
-                        new BadRequestAlertException("Chưa có bản ghi tồn kho cho vật tư này", ENTITY_NAME, "nostock")
-                    );
+                ConsumableStock stock = getOrCreateConsumableStockForItem(itemId, line.getAssetItem());
                 int onHand = stock.getQuantityOnHand() != null ? stock.getQuantityOnHand() : 0;
                 if (onHand < qty) {
                     throw new BadRequestAlertException(
@@ -568,22 +621,21 @@ public class AllocationRequestService {
                         if (allocationRequestDTO.getStatus() != AllocationRequestStatus.CANCELLED) {
                             throw new AccessDeniedException("Chỉ được hủy yêu cầu (CANCELLED)");
                         }
-                    }
-                    if (
-                        allocationRequestDTO.getReason() != null ||
-                        allocationRequestDTO.getBeneficiaryNote() != null ||
-                        allocationRequestDTO.getAssigneeType() != null ||
-                        allocationRequestDTO.getBeneficiaryEmployee() != null ||
-                        allocationRequestDTO.getBeneficiaryDepartment() != null ||
-                        allocationRequestDTO.getBeneficiaryLocation() != null ||
-                        allocationRequestDTO.getRequestDate() != null ||
-                        allocationRequestDTO.getCode() != null ||
-                        allocationRequestDTO.getRequester() != null
-                    ) {
-                        throw new AccessDeniedException("Chỉ được gửi id và status CANCELLED");
-                    }
-                    if (existingAllocationRequest.getStatus() != AllocationRequestStatus.PENDING) {
-                        throw new BadRequestAlertException("Chỉ hủy khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                        if (employeeAllocationCancelHasExtraFields(allocationRequestDTO)) {
+                            throw new AccessDeniedException("Khi hủy chỉ gửi id và status CANCELLED");
+                        }
+                        if (existingAllocationRequest.getStatus() != AllocationRequestStatus.PENDING) {
+                            throw new BadRequestAlertException("Chỉ hủy khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                        }
+                    } else {
+                        if (existingAllocationRequest.getStatus() != AllocationRequestStatus.PENDING) {
+                            throw new BadRequestAlertException("Chỉ sửa khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                        }
+                        if (employeeAllocationContentPatchHasForbiddenFields(allocationRequestDTO)) {
+                            throw new AccessDeniedException(
+                                "Chỉ được sửa lý do, ghi chú đính kèm, ghi chú thêm (người nhận)"
+                            );
+                        }
                     }
                 }
                 AllocationRequestStatus oldStatus = existingAllocationRequest.getStatus();
@@ -652,6 +704,57 @@ public class AllocationRequestService {
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
             throw new AccessDeniedException("Chỉ QLTS/Admin được xóa yêu cầu cấp phát");
         }
+        AllocationRequest ar = allocationRequestRepository
+            .findOneWithEagerRelationships(id)
+            .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy yêu cầu cấp phát", ENTITY_NAME, "notfound"));
+        AllocationRequestStatus s = ar.getStatus();
+        if (
+            s != AllocationRequestStatus.PENDING &&
+            s != AllocationRequestStatus.REJECTED &&
+            s != AllocationRequestStatus.CANCELLED
+        ) {
+            throw new BadRequestAlertException(
+                "Chỉ xóa yêu cầu ở trạng thái chờ duyệt / từ chối / đã hủy",
+                ENTITY_NAME,
+                "baddeletestatus"
+            );
+        }
+        if (ar.getStockIssue() != null) {
+            throw new BadRequestAlertException("Đã có phiếu xuất kho — không xóa được", ENTITY_NAME, "hasstockissue");
+        }
+        allocationRequestLineRepository.deleteAll(allocationRequestLineRepository.findAllByRequest_Id(id));
         allocationRequestRepository.deleteById(id);
+    }
+
+    private static boolean employeeAllocationCancelHasExtraFields(AllocationRequestDTO d) {
+        return (
+            d.getReason() != null ||
+            d.getAttachmentNote() != null ||
+            d.getBeneficiaryNote() != null ||
+            d.getAssigneeType() != null ||
+            d.getBeneficiaryEmployee() != null ||
+            d.getBeneficiaryDepartment() != null ||
+            d.getBeneficiaryLocation() != null ||
+            d.getRequestDate() != null ||
+            d.getCode() != null ||
+            d.getRequester() != null ||
+            d.getStockIssueId() != null ||
+            d.getStockIssueCode() != null
+        );
+    }
+
+    private static boolean employeeAllocationContentPatchHasForbiddenFields(AllocationRequestDTO d) {
+        return (
+            d.getCode() != null ||
+            d.getRequestDate() != null ||
+            d.getRequester() != null ||
+            d.getAssigneeType() != null ||
+            d.getBeneficiaryEmployee() != null ||
+            d.getBeneficiaryDepartment() != null ||
+            d.getBeneficiaryLocation() != null ||
+            d.getStockIssueId() != null ||
+            d.getStockIssueCode() != null ||
+            d.getStatus() != null
+        );
     }
 }
