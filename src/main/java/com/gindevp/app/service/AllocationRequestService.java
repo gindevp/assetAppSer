@@ -99,19 +99,17 @@ public class AllocationRequestService {
      * Bản ghi tồn kho vật tư theo master — nếu chưa có thì tạo 0/0 để trừ tồn nhất quán (tránh lỗi nostock khi chưa nhập kho đúng luồng).
      */
     private ConsumableStock getOrCreateConsumableStockForItem(Long assetItemId, AssetItem lineAssetItem) {
-        Optional<ConsumableStock> existing = consumableStockRepository.findFirstByAssetItem_Id(assetItemId);
-        if (existing.isPresent()) {
-            return existing.get();
-        }
-        AssetItem itemRef =
-            lineAssetItem != null && lineAssetItem.getId() != null ? lineAssetItem : new AssetItem().id(assetItemId);
-        ConsumableStock row = new ConsumableStock();
-        row.setQuantityOnHand(0);
-        row.setQuantityIssued(0);
-        row.setAssetItem(itemRef);
-        row.setNote("Khởi tạo khi hoàn thành cấp phát — trước đó chưa có bản ghi tồn kho");
-        LOG.info("Created consumable_stock for assetItemId {} (missing before allocation completion)", assetItemId);
-        return consumableStockRepository.save(row);
+        return consumableStockRepository.findFirstByAssetItem_Id(assetItemId).orElseGet(() -> {
+            AssetItem itemRef =
+                lineAssetItem != null && lineAssetItem.getId() != null ? lineAssetItem : new AssetItem().id(assetItemId);
+            ConsumableStock row = new ConsumableStock();
+            row.setQuantityOnHand(0);
+            row.setQuantityIssued(0);
+            row.setAssetItem(itemRef);
+            row.setNote("Khởi tạo khi hoàn thành cấp phát — trước đó chưa có bản ghi tồn kho");
+            LOG.info("Created consumable_stock for assetItemId {} (missing before allocation completion)", assetItemId);
+            return consumableStockRepository.save(row);
+        });
     }
 
     private void validateDeviceLinesPickedIfApproving(AllocationRequest allocationRequest) {
