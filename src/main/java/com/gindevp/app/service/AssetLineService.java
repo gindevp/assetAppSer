@@ -87,7 +87,11 @@ public class AssetLineService {
     @Transactional(readOnly = true)
     public List<AssetLineDTO> findAll() {
         LOG.debug("Request to get all AssetLines");
-        return assetLineRepository.findAll().stream().map(assetLineMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
+        return assetLineRepository
+            .findAllWithToOneRelationships()
+            .stream()
+            .map(assetLineMapper::toDto)
+            .collect(Collectors.toCollection(LinkedList::new));
     }
 
     /**
