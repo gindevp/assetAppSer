@@ -27,14 +27,14 @@ public interface AssetGroupRepository extends JpaRepository<AssetGroup, Long> {
     }
 
     @Query(
-        value = "select assetGroup from AssetGroup assetGroup left join fetch assetGroup.assetType",
+        value = "select assetGroup from AssetGroup assetGroup",
         countQuery = "select count(assetGroup) from AssetGroup assetGroup"
     )
     Page<AssetGroup> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("select assetGroup from AssetGroup assetGroup left join fetch assetGroup.assetType")
+    @Query("select assetGroup from AssetGroup assetGroup")
     List<AssetGroup> findAllWithToOneRelationships();
 
-    @Query("select assetGroup from AssetGroup assetGroup left join fetch assetGroup.assetType where assetGroup.id =:id")
+    @Query("select assetGroup from AssetGroup assetGroup where assetGroup.id =:id")
     Optional<AssetGroup> findOneWithToOneRelationships(@Param("id") Long id);
 }

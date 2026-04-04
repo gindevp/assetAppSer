@@ -1,5 +1,6 @@
 package com.gindevp.app.service.dto;
 
+import com.gindevp.app.domain.enumeration.Asssettype;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
@@ -27,6 +28,9 @@ public class AssetLineDTO implements Serializable {
 
     @NotNull
     private Boolean active;
+
+    @NotNull
+    private Asssettype assetType;
 
     private AssetGroupDTO assetGroup;
 
@@ -70,6 +74,14 @@ public class AssetLineDTO implements Serializable {
         this.active = active;
     }
 
+    public Asssettype getAssetType() {
+        return assetType;
+    }
+
+    public void setAssetType(Asssettype assetType) {
+        this.assetType = assetType;
+    }
+
     public AssetGroupDTO getAssetGroup() {
         return assetGroup;
     }
@@ -108,6 +120,7 @@ public class AssetLineDTO implements Serializable {
             ", name='" + getName() + "'" +
             ", description='" + getDescription() + "'" +
             ", active='" + getActive() + "'" +
+            ", assetType='" + getAssetType() + "'" +
             ", assetGroup=" + getAssetGroup() +
             "}";
     }

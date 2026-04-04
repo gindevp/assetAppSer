@@ -42,6 +42,8 @@ public interface AllocationRequestMapper extends EntityMapper<AllocationRequestD
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "fullName", source = "fullName")
+    @Mapping(target = "code", source = "code")
+    @Mapping(target = "department", source = "department", qualifiedByName = "beneficiaryDepartmentDto")
     EmployeeDTO toDtoEmployeeFullName(Employee employee);
 
     @Named("beneficiaryEmployeeDto")

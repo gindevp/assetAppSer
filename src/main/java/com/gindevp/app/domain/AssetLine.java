@@ -1,6 +1,7 @@
 package com.gindevp.app.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.gindevp.app.domain.enumeration.Asssettype;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
@@ -39,11 +40,25 @@ public class AssetLine implements Serializable {
     @Column(name = "active", nullable = false)
     private Boolean active;
 
+    /** Thiết bị / Vật tư — nguồn chính cho phân loại (không dùng loại ở cấp nhóm cho nghiệp vụ mới). */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "asset_type", nullable = false, length = 20)
+    private Asssettype assetType = Asssettype.DEVICE;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "assetType" }, allowSetters = true)
     private AssetGroup assetGroup;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
+
+    @PrePersist
+    @PreUpdate
+    protected void applyLineAssetTypeDefault() {
+        if (assetType == null) {
+            assetType = Asssettype.DEVICE;
+        }
+    }
 
     public Long getId() {
         return this.id;
@@ -110,6 +125,19 @@ public class AssetLine implements Serializable {
         this.active = active;
     }
 
+    public Asssettype getAssetType() {
+        return this.assetType;
+    }
+
+    public void setAssetType(Asssettype assetType) {
+        this.assetType = assetType;
+    }
+
+    public AssetLine assetType(Asssettype assetType) {
+        this.setAssetType(assetType);
+        return this;
+    }
+
     public AssetGroup getAssetGroup() {
         return this.assetGroup;
     }
@@ -151,6 +179,7 @@ public class AssetLine implements Serializable {
             ", name='" + getName() + "'" +
             ", description='" + getDescription() + "'" +
             ", active='" + getActive() + "'" +
+            ", assetType='" + getAssetType() + "'" +
             "}";
     }
 }

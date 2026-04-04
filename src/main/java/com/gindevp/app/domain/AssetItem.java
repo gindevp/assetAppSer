@@ -36,7 +36,7 @@ public class AssetItem implements Serializable {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "management_type", nullable = false)
-    private AssetManagementType managementType;
+    private AssetManagementType managementType = AssetManagementType.DEVICE;
 
     @Size(max = 20)
     @Column(name = "unit", length = 20)
@@ -66,6 +66,14 @@ public class AssetItem implements Serializable {
     private AssetLine assetLine;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
+
+    @PrePersist
+    @PreUpdate
+    protected void applyManagementTypeDefault() {
+        if (managementType == null) {
+            managementType = AssetManagementType.DEVICE;
+        }
+    }
 
     public Long getId() {
         return this.id;

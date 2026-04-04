@@ -27,14 +27,25 @@ public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, Lo
     }
 
     @Query(
-        value = "select returnRequest from ReturnRequest returnRequest left join fetch returnRequest.requester",
+        value =
+            "select returnRequest from ReturnRequest returnRequest " +
+            "left join fetch returnRequest.requester req " +
+            "left join fetch req.department",
         countQuery = "select count(returnRequest) from ReturnRequest returnRequest"
     )
     Page<ReturnRequest> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("select returnRequest from ReturnRequest returnRequest left join fetch returnRequest.requester")
+    @Query(
+        "select returnRequest from ReturnRequest returnRequest " +
+            "left join fetch returnRequest.requester req " +
+            "left join fetch req.department"
+    )
     List<ReturnRequest> findAllWithToOneRelationships();
 
-    @Query("select returnRequest from ReturnRequest returnRequest left join fetch returnRequest.requester where returnRequest.id =:id")
+    @Query(
+        "select returnRequest from ReturnRequest returnRequest " +
+            "left join fetch returnRequest.requester req " +
+            "left join fetch req.department where returnRequest.id =:id"
+    )
     Optional<ReturnRequest> findOneWithToOneRelationships(@Param("id") Long id);
 }

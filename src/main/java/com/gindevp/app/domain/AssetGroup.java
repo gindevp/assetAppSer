@@ -41,10 +41,18 @@ public class AssetGroup implements Serializable {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "asset_type", nullable = false)
-    private Asssettype assetType;
+    @Column(name = "asset_type", nullable = false, length = 20)
+    private Asssettype assetType = Asssettype.DEVICE;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
+
+    @PrePersist
+    @PreUpdate
+    protected void applyAssetTypeDefault() {
+        if (assetType == null) {
+            assetType = Asssettype.DEVICE;
+        }
+    }
 
     public Long getId() {
         return this.id;

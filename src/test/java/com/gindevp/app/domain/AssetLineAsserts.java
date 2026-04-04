@@ -50,7 +50,8 @@ public class AssetLineAsserts {
             .satisfies(e -> assertThat(e.getCode()).as("check code").isEqualTo(actual.getCode()))
             .satisfies(e -> assertThat(e.getName()).as("check name").isEqualTo(actual.getName()))
             .satisfies(e -> assertThat(e.getDescription()).as("check description").isEqualTo(actual.getDescription()))
-            .satisfies(e -> assertThat(e.getActive()).as("check active").isEqualTo(actual.getActive()));
+            .satisfies(e -> assertThat(e.getActive()).as("check active").isEqualTo(actual.getActive()))
+            .satisfies(e -> assertThat(e.getAssetType()).as("check assetType").isEqualTo(actual.getAssetType()));
     }
 
     /**

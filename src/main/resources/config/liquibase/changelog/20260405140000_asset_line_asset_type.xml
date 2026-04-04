@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Loại tài sản (Thiết bị / Vật tư) ở cấp dòng, đồng bộ từ nhóm hiện tại rồi dùng làm nguồn chính -->
+    <changeSet id="20260405140000-asset-line-asset-type" author="asset-app">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="asset_line"/>
+            <not>
+                <columnExists tableName="asset_line" columnName="asset_type"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="asset_line">
+            <column name="asset_type" type="varchar(20)" defaultValue="DEVICE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql stripComments="true">
+            UPDATE asset_line al
+            INNER JOIN asset_group ag ON ag.id = al.asset_group_id
+            SET al.asset_type = COALESCE(NULLIF(TRIM(ag.asset_type), ''), 'DEVICE');
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

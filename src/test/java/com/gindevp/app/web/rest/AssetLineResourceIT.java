@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gindevp.app.IntegrationTest;
 import com.gindevp.app.domain.AssetLine;
+import com.gindevp.app.domain.enumeration.Asssettype;
 import com.gindevp.app.repository.AssetLineRepository;
 import com.gindevp.app.service.AssetLineService;
 import com.gindevp.app.service.dto.AssetLineDTO;
@@ -55,6 +56,9 @@ class AssetLineResourceIT {
     private static final Boolean DEFAULT_ACTIVE = false;
     private static final Boolean UPDATED_ACTIVE = true;
 
+    private static final Asssettype DEFAULT_ASSET_TYPE = Asssettype.DEVICE;
+    private static final Asssettype UPDATED_ASSET_TYPE = Asssettype.CONSUMABLE;
+
     private static final String ENTITY_API_URL = "/api/asset-lines";
     private static final String ENTITY_API_URL_ID = ENTITY_API_URL + "/{id}";
 
@@ -93,7 +97,12 @@ class AssetLineResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static AssetLine createEntity() {
-        return new AssetLine().code(DEFAULT_CODE).name(DEFAULT_NAME).description(DEFAULT_DESCRIPTION).active(DEFAULT_ACTIVE);
+        return new AssetLine()
+            .code(DEFAULT_CODE)
+            .name(DEFAULT_NAME)
+            .description(DEFAULT_DESCRIPTION)
+            .active(DEFAULT_ACTIVE)
+            .assetType(DEFAULT_ASSET_TYPE);
     }
 
     /**
@@ -103,7 +112,12 @@ class AssetLineResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static AssetLine createUpdatedEntity() {
-        return new AssetLine().code(UPDATED_CODE).name(UPDATED_NAME).description(UPDATED_DESCRIPTION).active(UPDATED_ACTIVE);
+        return new AssetLine()
+            .code(UPDATED_CODE)
+            .name(UPDATED_NAME)
+            .description(UPDATED_DESCRIPTION)
+            .active(UPDATED_ACTIVE)
+            .assetType(UPDATED_ASSET_TYPE);
     }
 
     @BeforeEach
@@ -227,7 +241,8 @@ class AssetLineResourceIT {
             .andExpect(jsonPath("$.[*].code").value(hasItem(DEFAULT_CODE)))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
-            .andExpect(jsonPath("$.[*].active").value(hasItem(DEFAULT_ACTIVE)));
+            .andExpect(jsonPath("$.[*].active").value(hasItem(DEFAULT_ACTIVE)))
+            .andExpect(jsonPath("$.[*].assetType").value(hasItem(DEFAULT_ASSET_TYPE.toString())));
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -262,7 +277,8 @@ class AssetLineResourceIT {
             .andExpect(jsonPath("$.code").value(DEFAULT_CODE))
             .andExpect(jsonPath("$.name").value(DEFAULT_NAME))
             .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
-            .andExpect(jsonPath("$.active").value(DEFAULT_ACTIVE));
+            .andExpect(jsonPath("$.active").value(DEFAULT_ACTIVE))
+            .andExpect(jsonPath("$.assetType").value(DEFAULT_ASSET_TYPE.toString()));
     }
 
     @Test
@@ -284,7 +300,12 @@ class AssetLineResourceIT {
         AssetLine updatedAssetLine = assetLineRepository.findById(assetLine.getId()).orElseThrow();
         // Disconnect from session so that the updates on updatedAssetLine are not directly saved in db
         em.detach(updatedAssetLine);
-        updatedAssetLine.code(UPDATED_CODE).name(UPDATED_NAME).description(UPDATED_DESCRIPTION).active(UPDATED_ACTIVE);
+        updatedAssetLine
+            .code(UPDATED_CODE)
+            .name(UPDATED_NAME)
+            .description(UPDATED_DESCRIPTION)
+            .active(UPDATED_ACTIVE)
+            .assetType(UPDATED_ASSET_TYPE);
         AssetLineDTO assetLineDTO = assetLineMapper.toDto(updatedAssetLine);
 
         restAssetLineMockMvc
@@ -405,7 +426,12 @@ class AssetLineResourceIT {
         AssetLine partialUpdatedAssetLine = new AssetLine();
         partialUpdatedAssetLine.setId(assetLine.getId());
 
-        partialUpdatedAssetLine.code(UPDATED_CODE).name(UPDATED_NAME).description(UPDATED_DESCRIPTION).active(UPDATED_ACTIVE);
+        partialUpdatedAssetLine
+            .code(UPDATED_CODE)
+            .name(UPDATED_NAME)
+            .description(UPDATED_DESCRIPTION)
+            .active(UPDATED_ACTIVE)
+            .assetType(UPDATED_ASSET_TYPE);
 
         restAssetLineMockMvc
             .perform(

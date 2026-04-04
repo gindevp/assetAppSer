@@ -27,18 +27,28 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
     }
 
     @Query(
-        value = "select repairRequest from RepairRequest repairRequest left join fetch repairRequest.requester left join fetch repairRequest.equipment",
+        value =
+            "select repairRequest from RepairRequest repairRequest " +
+            "left join fetch repairRequest.requester req " +
+            "left join fetch req.department " +
+            "left join fetch repairRequest.equipment",
         countQuery = "select count(repairRequest) from RepairRequest repairRequest"
     )
     Page<RepairRequest> findAllWithToOneRelationships(Pageable pageable);
 
     @Query(
-        "select repairRequest from RepairRequest repairRequest left join fetch repairRequest.requester left join fetch repairRequest.equipment"
+        "select repairRequest from RepairRequest repairRequest " +
+            "left join fetch repairRequest.requester req " +
+            "left join fetch req.department " +
+            "left join fetch repairRequest.equipment"
     )
     List<RepairRequest> findAllWithToOneRelationships();
 
     @Query(
-        "select repairRequest from RepairRequest repairRequest left join fetch repairRequest.requester left join fetch repairRequest.equipment where repairRequest.id =:id"
+        "select repairRequest from RepairRequest repairRequest " +
+            "left join fetch repairRequest.requester req " +
+            "left join fetch req.department " +
+            "left join fetch repairRequest.equipment where repairRequest.id =:id"
     )
     Optional<RepairRequest> findOneWithToOneRelationships(@Param("id") Long id);
 }

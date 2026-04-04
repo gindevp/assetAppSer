@@ -18,6 +18,5 @@ public interface AssetLineMapper extends EntityMapper<AssetLineDTO, AssetLine> {
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "name", source = "name")
-    @Mapping(target = "assetType", source = "assetType")
     AssetGroupDTO toDtoAssetGroupName(AssetGroup assetGroup);
 }

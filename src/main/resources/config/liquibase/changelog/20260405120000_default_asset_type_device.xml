@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Mã hàng: loại quản lý mặc định Thiết bị -->
+    <changeSet id="20260405120000-asset-item-management-default" author="asset-app">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="asset_item"/>
+            <columnExists tableName="asset_item" columnName="management_type"/>
+        </preConditions>
+        <sql stripComments="true">
+            UPDATE asset_item SET management_type = 'DEVICE'
+            WHERE management_type IS NULL OR TRIM(management_type) = '';
+        </sql>
+        <addDefaultValue tableName="asset_item" columnName="management_type" defaultValue="DEVICE"/>
+    </changeSet>
+
+    <!-- Nhóm tài sản: bản ghi lệch NULL/rỗng → DEVICE (default cột thường đã có từ 20260331193000) -->
+    <changeSet id="20260405120000-asset-group-type-default" author="asset-app">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="asset_group"/>
+            <columnExists tableName="asset_group" columnName="asset_type"/>
+        </preConditions>
+        <sql stripComments="true">
+            UPDATE asset_group SET asset_type = 'DEVICE'
+            WHERE asset_type IS NULL OR TRIM(asset_type) = '';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
