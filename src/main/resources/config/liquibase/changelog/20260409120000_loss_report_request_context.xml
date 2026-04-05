@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260409120000-1" author="app">
+        <addColumn tableName="loss_report_request">
+            <column name="loss_occurred_at" type="varchar(500)"/>
+            <column name="loss_location" type="varchar(1000)"/>
+            <column name="loss_description" type="varchar(2000)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

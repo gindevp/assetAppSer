@@ -2,11 +2,14 @@ package com.gindevp.app.service;
 
 import com.gindevp.app.domain.*; // for static metamodels
 import com.gindevp.app.domain.RepairRequest;
+import com.gindevp.app.domain.RepairRequestLine;
 import com.gindevp.app.repository.RepairRequestRepository;
 import com.gindevp.app.service.criteria.RepairRequestCriteria;
 import com.gindevp.app.service.dto.RepairRequestDTO;
 import com.gindevp.app.service.mapper.RepairRequestMapper;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -122,11 +125,22 @@ public class RepairRequestQueryService extends QueryService<RepairRequest> {
                 );
             }
             if (criteria.getEquipmentId() != null) {
-                specification = specification.and(
-                    buildSpecification(criteria.getEquipmentId(), root ->
-                        root.join(RepairRequest_.equipment, JoinType.LEFT).get(Equipment_.id)
-                    )
-                );
+                specification = specification.and((root, query, cb) -> {
+                    Long eqId = criteria.getEquipmentId().getEquals();
+                    if (eqId == null) {
+                        return cb.conjunction();
+                    }
+                    Subquery<Integer> sq = query.subquery(Integer.class);
+                    Root<RepairRequestLine> lineRoot = sq.from(RepairRequestLine.class);
+                    sq.select(cb.literal(1))
+                        .where(
+                            cb.and(
+                                cb.equal(lineRoot.get("repairRequest"), root),
+                                cb.equal(lineRoot.get("equipment").get("id"), eqId)
+                            )
+                        );
+                    return cb.or(cb.equal(root.get("equipment").get("id"), eqId), cb.exists(sq));
+                });
             }
         }
         return specification;

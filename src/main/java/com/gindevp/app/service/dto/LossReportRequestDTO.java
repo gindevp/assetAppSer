@@ -30,8 +30,17 @@ public class LossReportRequestDTO implements Serializable {
     @Min(1)
     private Integer quantity;
 
+    @Size(max = 500)
+    private String lossOccurredAt;
+
+    @Size(max = 1000)
+    private String lossLocation;
+
     @Size(max = 2000)
     private String reason;
+
+    @Size(max = 2000)
+    private String lossDescription;
 
     private EmployeeDTO requester;
 
@@ -88,12 +97,36 @@ public class LossReportRequestDTO implements Serializable {
         this.quantity = quantity;
     }
 
+    public String getLossOccurredAt() {
+        return lossOccurredAt;
+    }
+
+    public void setLossOccurredAt(String lossOccurredAt) {
+        this.lossOccurredAt = lossOccurredAt;
+    }
+
+    public String getLossLocation() {
+        return lossLocation;
+    }
+
+    public void setLossLocation(String lossLocation) {
+        this.lossLocation = lossLocation;
+    }
+
     public String getReason() {
         return reason;
     }
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public String getLossDescription() {
+        return lossDescription;
+    }
+
+    public void setLossDescription(String lossDescription) {
+        this.lossDescription = lossDescription;
     }
 
     public EmployeeDTO getRequester() {

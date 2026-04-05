@@ -7,9 +7,11 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Yêu cầu sửa chữa — gắn 1 thiết bị (Phase 1 đơn giản)
+ * Yêu cầu sửa chữa — có thể nhiều thiết bị qua {@link RepairRequestLine}; cột equipment lưu thiết bị đầu tiên (tương thích lọc/legacy).
  */
 @Entity
 @Table(name = "repair_request")
@@ -71,6 +73,11 @@ public class RepairRequest implements Serializable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "assetItem", "supplier" }, allowSetters = true)
     private Equipment equipment;
+
+    @OneToMany(mappedBy = "repairRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties(value = { "repairRequest" }, allowSetters = true)
+    @OrderBy("lineNo ASC")
+    private List<RepairRequestLine> lines = new ArrayList<>();
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -223,6 +230,14 @@ public class RepairRequest implements Serializable {
     public RepairRequest equipment(Equipment equipment) {
         this.setEquipment(equipment);
         return this;
+    }
+
+    public List<RepairRequestLine> getLines() {
+        return lines;
+    }
+
+    public void setLines(List<RepairRequestLine> lines) {
+        this.lines = lines;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

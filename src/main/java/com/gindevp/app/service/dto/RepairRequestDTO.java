@@ -6,12 +6,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 /**
  * A DTO for the {@link com.gindevp.app.domain.RepairRequest} entity.
  */
-@Schema(description = "Yêu cầu sửa chữa — gắn 1 thiết bị (Phase 1 đơn giản)")
+@Schema(description = "Yêu cầu sửa chữa — có thể nhiều thiết bị (lines); equipment là thiết bị đầu tiên khi có dòng")
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class RepairRequestDTO implements Serializable {
 
@@ -48,6 +49,8 @@ public class RepairRequestDTO implements Serializable {
     private EmployeeDTO requester;
 
     private EquipmentDTO equipment;
+
+    private List<RepairRequestLineDTO> lines;
 
     public Long getId() {
         return id;
@@ -143,6 +146,14 @@ public class RepairRequestDTO implements Serializable {
 
     public void setEquipment(EquipmentDTO equipment) {
         this.equipment = equipment;
+    }
+
+    public List<RepairRequestLineDTO> getLines() {
+        return lines;
+    }
+
+    public void setLines(List<RepairRequestLineDTO> lines) {
+        this.lines = lines;
     }
 
     @Override

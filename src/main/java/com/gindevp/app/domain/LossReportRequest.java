@@ -48,9 +48,25 @@ public class LossReportRequest implements Serializable {
     @Column(name = "quantity")
     private Integer quantity;
 
+    /** Thời điểm / mô tả thời gian do người báo nhập (không gán tự động). */
+    @Size(max = 500)
+    @Column(name = "loss_occurred_at", length = 500)
+    private String lossOccurredAt;
+
+    /** Địa điểm xảy ra / phát hiện mất — do người báo nhập. */
+    @Size(max = 1000)
+    @Column(name = "loss_location", length = 1000)
+    private String lossLocation;
+
+    /** Lý do báo mất (bản ghi cũ có thể gộp nhiều dòng trong cột reason). */
     @Size(max = 2000)
     @Column(name = "reason", length = 2000)
     private String reason;
+
+    /** Mô tả chi tiết về việc mất. */
+    @Size(max = 2000)
+    @Column(name = "loss_description", length = 2000)
+    private String lossDescription;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "department" }, allowSetters = true)
@@ -112,12 +128,36 @@ public class LossReportRequest implements Serializable {
         this.quantity = quantity;
     }
 
+    public String getLossOccurredAt() {
+        return lossOccurredAt;
+    }
+
+    public void setLossOccurredAt(String lossOccurredAt) {
+        this.lossOccurredAt = lossOccurredAt;
+    }
+
+    public String getLossLocation() {
+        return lossLocation;
+    }
+
+    public void setLossLocation(String lossLocation) {
+        this.lossLocation = lossLocation;
+    }
+
     public String getReason() {
         return reason;
     }
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public String getLossDescription() {
+        return lossDescription;
+    }
+
+    public void setLossDescription(String lossDescription) {
+        this.lossDescription = lossDescription;
     }
 
     public Employee getRequester() {

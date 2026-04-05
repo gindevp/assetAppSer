@@ -13,11 +13,23 @@ import org.mapstruct.*;
 /**
  * Mapper for the entity {@link RepairRequest} and its DTO {@link RepairRequestDTO}.
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = { RepairRequestLineMapper.class })
 public interface RepairRequestMapper extends EntityMapper<RepairRequestDTO, RepairRequest> {
     @Mapping(target = "requester", source = "requester", qualifiedByName = "employeeFullName")
     @Mapping(target = "equipment", source = "equipment", qualifiedByName = "equipmentEquipmentCode")
+    @Mapping(target = "lines", source = "lines")
     RepairRequestDTO toDto(RepairRequest s);
+
+    @Override
+    @Mapping(target = "lines", ignore = true)
+    @Mapping(target = "requester", source = "requester")
+    @Mapping(target = "equipment", source = "equipment")
+    RepairRequest toEntity(RepairRequestDTO dto);
+
+    @Override
+    @Mapping(target = "lines", ignore = true)
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    void partialUpdate(@MappingTarget RepairRequest entity, RepairRequestDTO dto);
 
     @Named("employeeFullName")
     @BeanMapping(ignoreByDefault = true)

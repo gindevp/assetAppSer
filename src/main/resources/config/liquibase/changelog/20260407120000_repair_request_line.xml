@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260407120000-repair-request-line-table" author="asset-app">
+        <createTable tableName="repair_request_line" remarks="Dòng thiết bị trên phiếu sửa chữa (nhiều thiết bị / phiếu)">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="line_no" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repair_request_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="equipment_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseColumnNames="repair_request_id"
+            baseTableName="repair_request_line"
+            constraintName="fk_repair_request_line__repair_request_id"
+            referencedColumnNames="id"
+            referencedTableName="repair_request"/>
+        <addForeignKeyConstraint
+            baseColumnNames="equipment_id"
+            baseTableName="repair_request_line"
+            constraintName="fk_repair_request_line__equipment_id"
+            referencedColumnNames="id"
+            referencedTableName="equipment"/>
+    </changeSet>
+
+    <changeSet id="20260407120000-repair-request-line-backfill" author="asset-app">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="sequence_generator"/>
+        </preConditions>
+        <sql dbms="mysql">
+            INSERT INTO repair_request_line (id, line_no, repair_request_id, equipment_id)
+            SELECT g.base + r.rn, 1, r.rr_id, r.eq_id
+            FROM (
+                SELECT rr.id AS rr_id, rr.equipment_id AS eq_id, ROW_NUMBER() OVER (ORDER BY rr.id) AS rn
+                FROM repair_request rr
+                WHERE rr.equipment_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM repair_request_line rrl WHERE rrl.repair_request_id = rr.id
+                  )
+            ) r
+            CROSS JOIN (
+                SELECT GREATEST(
+                    COALESCE((SELECT MAX(id) FROM repair_request_line), 0),
+                    COALESCE((SELECT next_val FROM sequence_generator WHERE sequence_name = 'default'), 0)
+                ) AS base
+            ) g;
+        </sql>
+    </changeSet>
+
+    <changeSet id="20260407120000-sequence-repair-request-line" author="asset-app" runOnChange="true">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="sequence_generator"/>
+        </preConditions>
+        <sql dbms="mysql">
+            UPDATE sequence_generator
+            SET next_val = GREATEST(
+                next_val,
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM repair_request_line)
+            )
+            WHERE sequence_name = 'default';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

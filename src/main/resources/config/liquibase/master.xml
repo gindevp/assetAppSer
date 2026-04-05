@@ -75,6 +75,9 @@
     <include file="config/liquibase/changelog/20260405140000_asset_line_asset_type.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260404120000_rejection_reason_allocation_repair.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260406120000_loss_report_request.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260407120000_repair_request_line.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260408120000_repair_request_line_consumable.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260409120000_loss_report_request_context.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-constraints-changelog - JHipster will add liquibase constraints changelogs here -->
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>

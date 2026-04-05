@@ -150,6 +150,14 @@ public class LossReportRequestService {
         return Math.max(0, q - r);
     }
 
+    private static String trimToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
     public LossReportRequestDTO save(LossReportRequestDTO dto) {
         assertEmployeePortalCanCreate();
         Long eid = currentEmployeeService
@@ -165,12 +173,32 @@ public class LossReportRequestService {
             .findOneWithToOneRelationships(eid)
             .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy nhân viên", ENTITY_NAME, "noemployee"));
 
+        String lossOccurredAt = trimToNull(dto.getLossOccurredAt());
+        String lossLocation = trimToNull(dto.getLossLocation());
+        String reasonText = trimToNull(dto.getReason());
+        String lossDescription = trimToNull(dto.getLossDescription());
+        if (lossOccurredAt == null) {
+            throw new BadRequestAlertException("Nhập thời gian (xảy ra / phát hiện mất)", ENTITY_NAME, "nolosstime");
+        }
+        if (lossLocation == null) {
+            throw new BadRequestAlertException("Nhập địa điểm", ENTITY_NAME, "nolossplace");
+        }
+        if (reasonText == null) {
+            throw new BadRequestAlertException("Nhập lý do", ENTITY_NAME, "noreason");
+        }
+        if (lossDescription == null) {
+            throw new BadRequestAlertException("Nhập mô tả mất", ENTITY_NAME, "nolossdesc");
+        }
+
         LossReportRequest e = new LossReportRequest();
         e.setCode(dto.getCode());
         e.setRequestDate(dto.getRequestDate() != null ? dto.getRequestDate() : Instant.now());
         e.setStatus(LossReportRequestStatus.PENDING);
         e.setLossKind(dto.getLossKind());
-        e.setReason(dto.getReason() != null ? dto.getReason().trim() : null);
+        e.setLossOccurredAt(lossOccurredAt);
+        e.setLossLocation(lossLocation);
+        e.setReason(reasonText);
+        e.setLossDescription(lossDescription);
         e.setRequester(requester);
 
         if (dto.getLossKind() == LossReportKind.EQUIPMENT) {
@@ -182,8 +210,8 @@ public class LossReportRequestService {
                 throw new BadRequestAlertException("Đã có YC báo mất chờ duyệt cho thiết bị này", ENTITY_NAME, "duplicatepending");
             }
             Equipment eq = equipmentRepository.findById(eqId).orElseThrow(() -> new BadRequestAlertException("Không tìm thấy thiết bị", ENTITY_NAME, "noequipment"));
-            if (eq.getStatus() != EquipmentOperationalStatus.IN_USE && eq.getStatus() != EquipmentOperationalStatus.PENDING_ISSUE) {
-                throw new BadRequestAlertException("Chỉ báo mất thiết bị đang sử dụng / chờ xuất", ENTITY_NAME, "badequipmentstatus");
+            if (eq.getStatus() != EquipmentOperationalStatus.IN_USE) {
+                throw new BadRequestAlertException("Chỉ báo mất thiết bị đang sử dụng", ENTITY_NAME, "badequipmentstatus");
             }
             EquipmentAssignment assign = equipmentAssignmentRepository
                 .findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(eqId)
@@ -325,7 +353,10 @@ public class LossReportRequestService {
         d.setStatus(e.getStatus());
         d.setLossKind(e.getLossKind());
         d.setQuantity(e.getQuantity());
+        d.setLossOccurredAt(e.getLossOccurredAt());
+        d.setLossLocation(e.getLossLocation());
         d.setReason(e.getReason());
+        d.setLossDescription(e.getLossDescription());
         if (e.getRequester() != null) {
             d.setRequester(employeeMapper.toDto(e.getRequester()));
         }

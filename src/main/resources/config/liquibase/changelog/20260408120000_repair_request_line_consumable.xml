@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260408120000-repair-line-consumable-columns" author="asset-app">
+        <addColumn tableName="repair_request_line">
+            <column name="line_type" type="varchar(50)" defaultValue="DEVICE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="repair_request_line">
+            <column name="asset_item_id" type="bigint"/>
+        </addColumn>
+        <addColumn tableName="repair_request_line">
+            <column name="quantity" type="integer"/>
+        </addColumn>
+        <dropNotNullConstraint tableName="repair_request_line" columnName="equipment_id" columnDataType="bigint"/>
+        <addForeignKeyConstraint
+            baseColumnNames="asset_item_id"
+            baseTableName="repair_request_line"
+            constraintName="fk_repair_request_line__asset_item_id"
+            referencedColumnNames="id"
+            referencedTableName="asset_item"/>
+    </changeSet>
+</databaseChangeLog>
