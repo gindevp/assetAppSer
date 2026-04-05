@@ -97,10 +97,13 @@ public class LossReportRequestService {
     private boolean employeesInSameDepartment(Long employeeId1, Long employeeId2) {
         Optional<Employee> emp1 = employeeRepository.findOneWithToOneRelationships(employeeId1);
         Optional<Employee> emp2 = employeeRepository.findOneWithToOneRelationships(employeeId2);
-        if (emp1.isEmpty() || emp2.isEmpty()) return false;
-        Long d1 = emp1.get().getDepartment() != null ? emp1.get().getDepartment().getId() : null;
-        Long d2 = emp2.get().getDepartment() != null ? emp2.get().getDepartment().getId() : null;
-        return d1 != null && d1.equals(d2);
+        return emp1
+            .flatMap(e1 -> emp2.map(e2 -> {
+                Long d1 = e1.getDepartment() != null ? e1.getDepartment().getId() : null;
+                Long d2 = e2.getDepartment() != null ? e2.getDepartment().getId() : null;
+                return d1 != null && d1.equals(d2);
+            }))
+            .orElse(false);
     }
 
     private boolean assignmentMatchesRequester(EquipmentAssignment a, Employee requester) {

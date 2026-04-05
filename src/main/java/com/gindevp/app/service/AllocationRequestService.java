@@ -565,8 +565,8 @@ public class AllocationRequestService {
                 Optional<EquipmentAssignment> existingOpen = equipmentAssignmentRepository.findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(
                     eqId
                 );
-                if (existingOpen.isPresent()) {
-                    EquipmentAssignment ea = existingOpen.get();
+                EquipmentAssignment ea = existingOpen.orElse(null);
+                if (ea != null) {
                     String existingNote = ea.getNote();
                     if (existingNote != null && existingNote.contains(noteSuffix)) {
                         LOG.debug(
@@ -581,10 +581,10 @@ public class AllocationRequestService {
                         Optional<EquipmentAssignment> open = equipmentAssignmentRepository.findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(
                             eqId
                         );
-                        if (open.isEmpty()) {
+                        EquipmentAssignment a = open.orElse(null);
+                        if (a == null) {
                             break;
                         }
-                        EquipmentAssignment a = open.get();
                         a.setReturnedDate(today);
                         equipmentAssignmentRepository.save(a);
                         equipmentAssignmentRepository.flush();
