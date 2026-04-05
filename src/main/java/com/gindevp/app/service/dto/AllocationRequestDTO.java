@@ -31,6 +31,10 @@ public class AllocationRequestDTO implements Serializable {
     @Schema(description = "Ghi chú / link; có thể chứa dòng FILE:url sau khi upload")
     private String attachmentNote;
 
+    @Size(max = 2000)
+    @Schema(description = "Lý do từ chối (khi từ chối yêu cầu)")
+    private String rejectionReason;
+
     @NotNull
     private AllocationRequestStatus status;
 
@@ -92,6 +96,14 @@ public class AllocationRequestDTO implements Serializable {
 
     public void setAttachmentNote(String attachmentNote) {
         this.attachmentNote = attachmentNote;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public AllocationRequestStatus getStatus() {
@@ -196,6 +208,7 @@ public class AllocationRequestDTO implements Serializable {
             ", requestDate='" + getRequestDate() + "'" +
             ", reason='" + getReason() + "'" +
             ", attachmentNote='" + getAttachmentNote() + "'" +
+            ", rejectionReason='" + getRejectionReason() + "'" +
             ", status='" + getStatus() + "'" +
             ", beneficiaryNote='" + getBeneficiaryNote() + "'" +
             ", assigneeType=" + getAssigneeType() +

@@ -26,7 +26,9 @@ public interface ConsumableAssignmentMapper extends EntityMapper<ConsumableAssig
     @Named("assetItemName")
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
+    @Mapping(target = "code", source = "code")
     @Mapping(target = "name", source = "name")
+    @Mapping(target = "unit", source = "unit")
     AssetItemDTO toDtoAssetItemName(AssetItem assetItem);
 
     @Named("employeeFullName")

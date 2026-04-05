@@ -91,6 +91,8 @@ public class RepairRequestService {
             .map(RepairRequest::getStatus)
             .orElse(RepairRequestStatus.NEW);
         RepairRequest repairRequest = repairRequestMapper.toEntity(repairRequestDTO);
+        assertRepairStatusTransition(old, repairRequest.getStatus());
+        assertRejectionReasonWhenRejected(old, repairRequest.getStatus(), repairRequest.getRejectionReason());
         repairRequest = repairRequestRepository.save(repairRequest);
         applyRepairLifecycle(old, repairRequest);
         return repairRequestMapper.toDto(repairRequest);
@@ -134,11 +136,37 @@ public class RepairRequestService {
             .map(existingRepairRequest -> {
                 RepairRequestStatus old = existingRepairRequest.getStatus();
                 repairRequestMapper.partialUpdate(existingRepairRequest, repairRequestDTO);
+                assertRepairStatusTransition(old, existingRepairRequest.getStatus());
+                assertRejectionReasonWhenRejected(old, existingRepairRequest.getStatus(), existingRepairRequest.getRejectionReason());
                 RepairRequest saved = repairRequestRepository.save(existingRepairRequest);
                 applyRepairLifecycle(old, saved);
                 return saved;
             })
             .map(repairRequestMapper::toDto);
+    }
+
+    /**
+     * Luồng: NEW → (ACCEPTED | REJECTED) → IN_PROGRESS (chỉ từ ACCEPTED) → COMPLETED (chỉ từ IN_PROGRESS).
+     */
+    private static void assertRepairStatusTransition(RepairRequestStatus oldStatus, RepairRequestStatus newStatus) {
+        if (newStatus == null || newStatus == oldStatus) {
+            return;
+        }
+        boolean allowed =
+            (oldStatus == RepairRequestStatus.NEW && (newStatus == RepairRequestStatus.ACCEPTED || newStatus == RepairRequestStatus.REJECTED)) ||
+            (oldStatus == RepairRequestStatus.ACCEPTED && newStatus == RepairRequestStatus.IN_PROGRESS) ||
+            (oldStatus == RepairRequestStatus.IN_PROGRESS && newStatus == RepairRequestStatus.COMPLETED);
+        if (!allowed) {
+            throw new BadRequestAlertException(
+                "Chuyển trạng thái không hợp lệ: "
+                    + oldStatus
+                    + " → "
+                    + newStatus
+                    + ". Hoàn tất chỉ sau khi đã chuyển sang Đang sửa.",
+                ENTITY_NAME,
+                "badtransition"
+            );
+        }
     }
 
     private void applyRepairLifecycle(RepairRequestStatus oldStatus, RepairRequest saved) {
@@ -254,7 +282,20 @@ public class RepairRequestService {
             d.getEquipment() != null ||
             d.getStatus() != null ||
             d.getResolutionNote() != null ||
-            d.getRepairOutcome() != null
+            d.getRepairOutcome() != null ||
+            d.getRejectionReason() != null
         );
+    }
+
+    private static void assertRejectionReasonWhenRejected(
+        RepairRequestStatus oldStatus,
+        RepairRequestStatus newStatus,
+        String rejectionReason
+    ) {
+        if (oldStatus == RepairRequestStatus.NEW && newStatus == RepairRequestStatus.REJECTED) {
+            if (rejectionReason == null || rejectionReason.isBlank()) {
+                throw new BadRequestAlertException("Cần nhập lý do từ chối", ENTITY_NAME, "rejectionreason");
+            }
+        }
     }
 }

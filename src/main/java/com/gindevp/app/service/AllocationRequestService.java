@@ -13,9 +13,15 @@ import com.gindevp.app.service.dto.AllocationRequestDTO;
 import com.gindevp.app.service.mapper.AllocationRequestMapper;
 import com.gindevp.app.web.rest.errors.BadRequestAlertException;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -61,6 +67,12 @@ public class AllocationRequestService {
 
     private final AppAuditLogService appAuditLogService;
 
+    private final StockDocumentEventService stockDocumentEventService;
+
+    private final AssetItemRepository assetItemRepository;
+
+    private final AssetLineRepository assetLineRepository;
+
     public AllocationRequestService(
         AllocationRequestRepository allocationRequestRepository,
         AllocationRequestMapper allocationRequestMapper,
@@ -75,7 +87,10 @@ public class AllocationRequestService {
         LocationRepository locationRepository,
         StockIssueRepository stockIssueRepository,
         StockIssueLineRepository stockIssueLineRepository,
-        AppAuditLogService appAuditLogService
+        AppAuditLogService appAuditLogService,
+        StockDocumentEventService stockDocumentEventService,
+        AssetItemRepository assetItemRepository,
+        AssetLineRepository assetLineRepository
     ) {
         this.allocationRequestRepository = allocationRequestRepository;
         this.allocationRequestMapper = allocationRequestMapper;
@@ -91,9 +106,49 @@ public class AllocationRequestService {
         this.stockIssueRepository = stockIssueRepository;
         this.stockIssueLineRepository = stockIssueLineRepository;
         this.appAuditLogService = appAuditLogService;
+        this.stockDocumentEventService = stockDocumentEventService;
+        this.assetItemRepository = assetItemRepository;
+        this.assetLineRepository = assetLineRepository;
     }
 
     private static final String ENTITY_NAME = "allocationRequest";
+
+    private static String nvl(String s) {
+        return s != null ? s : "";
+    }
+
+    /** Mã + tên mặt hàng (vật tư) để hiển thị trong thông báo lỗi. */
+    private String labelConsumableAssetItem(Long assetItemId) {
+        if (assetItemId == null) {
+            return "mã vật tư (chưa xác định)";
+        }
+        return assetItemRepository
+            .findById(assetItemId)
+            .map(ai -> String.format("%s — %s [id mã=%d]", nvl(ai.getCode()), nvl(ai.getName()), assetItemId))
+            .orElse("id mã vật tư = " + assetItemId);
+    }
+
+    /** Dòng thiết bị trên phiếu YC (STT + dòng tài sản nếu có). */
+    private String labelDeviceRequestLine(AllocationRequestLine line) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Dòng ").append(line.getLineNo() != null ? line.getLineNo() : "?");
+        if (line.getAssetLine() != null && line.getAssetLine().getId() != null) {
+            assetLineRepository.findById(line.getAssetLine().getId()).ifPresent(al -> {
+                String nm = al.getName() != null && !al.getName().isBlank() ? al.getName() : nvl(al.getCode());
+                sb.append(" – dòng TS: ").append(nm);
+            });
+        }
+        sb.append(" (id dòng YC=").append(line.getId()).append(")");
+        return sb.toString();
+    }
+
+    private String labelEquipmentBrief(Equipment eq) {
+        if (eq == null) {
+            return "thiết bị (không rõ)";
+        }
+        String code = eq.getEquipmentCode() != null ? eq.getEquipmentCode() : "?";
+        return String.format("%s [id TB=%d]", code, eq.getId());
+    }
 
     /**
      * Bản ghi tồn kho vật tư theo master — nếu chưa có thì tạo 0/0 để trừ tồn nhất quán (tránh lỗi nostock khi chưa nhập kho đúng luồng).
@@ -112,6 +167,11 @@ public class AllocationRequestService {
         });
     }
 
+    /**
+     * Khi duyệt / ghi nhận phiếu xuất: bắt buộc đã chọn thiết bị tồn kho (DEVICE) và mã vật tư (CONSUMABLE) cho từng dòng.
+     * <p>
+     * Đủ tồn vật tư kiểm tra khi chuyển sang {@link AllocationRequestStatus#COMPLETED}.
+     */
     private void validateDeviceLinesPickedIfApproving(AllocationRequest allocationRequest) {
         Long id = allocationRequest.getId();
         if (id == null) {
@@ -122,38 +182,86 @@ public class AllocationRequestService {
             return;
         }
         validateAllDeviceLinesHaveEquipment(id);
-        validateConsumableLinesSufficientStock(id);
+        validateUniqueDeviceEquipmentPerRequest(id);
+        validateConsumableLinesHaveAssetItem(id);
     }
 
-    /**
-     * Mỗi dòng vật tư có số lượng yêu cầu dương phải có bản ghi tồn kho và đủ quantity_on_hand — khi duyệt, ghi nhận phiếu xuất và trước khi hoàn thành.
-     */
-    private void validateConsumableLinesSufficientStock(Long allocationRequestId) {
+    /** Dòng vật tư có SL &gt; 0 phải đã chọn mã mặt hàng (QLTS PATCH assetItem) trước khi duyệt. */
+    private void validateConsumableLinesHaveAssetItem(Long allocationRequestId) {
         for (AllocationRequestLine line : allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId)) {
             if (line.getLineType() != AssetManagementType.CONSUMABLE) {
-                continue;
-            }
-            if (line.getAssetItem() == null || line.getAssetItem().getId() == null) {
                 continue;
             }
             int qty = line.getQuantity() != null ? line.getQuantity() : 0;
             if (qty <= 0) {
                 continue;
             }
-            Long itemId = line.getAssetItem().getId();
-            ConsumableStock stock = consumableStockRepository
-                .findFirstByAssetItem_Id(itemId)
-                .orElseThrow(() ->
-                    new BadRequestAlertException(
-                        "Dòng vật tư chưa có tồn kho trong hệ thống — nhập kho mã vật tư này trước khi duyệt",
-                        ENTITY_NAME,
-                        "nostock"
-                    )
-                );
-            int onHand = stock.getQuantityOnHand() != null ? stock.getQuantityOnHand() : 0;
-            if (onHand < qty) {
+            if (line.getAssetItem() == null || line.getAssetItem().getId() == null) {
                 throw new BadRequestAlertException(
-                    "Không đủ tồn kho vật tư để duyệt (cần " + qty + ", hiện " + onHand + ")",
+                    "Dòng vật tư STT "
+                        + (line.getLineNo() != null ? line.getLineNo() : "?")
+                        + " (id dòng YC="
+                        + line.getId()
+                        + "): chưa chọn mã hàng — vào duyệt cấp phát và chọn «Chọn tài sản» (mã vật tư) trước khi duyệt.",
+                    ENTITY_NAME,
+                    "consumableitemrequired"
+                );
+            }
+        }
+    }
+
+    /**
+     * Trước khi hoàn thành: đủ tồn kho cho từng mã vật tư (cộng dồn SL các dòng cùng mã trên một phiếu).
+     */
+    private void validateConsumableLinesSufficientStock(Long allocationRequestId) {
+        Map<Long, Integer> demandByAssetItemId = new HashMap<>();
+        List<AllocationRequestLine> lines = allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId);
+        for (AllocationRequestLine line : lines) {
+            if (line.getLineType() != AssetManagementType.CONSUMABLE) {
+                continue;
+            }
+            int qty = line.getQuantity() != null ? line.getQuantity() : 0;
+            if (qty <= 0) {
+                continue;
+            }
+            if (line.getAssetItem() == null || line.getAssetItem().getId() == null) {
+                throw new BadRequestAlertException(
+                    "Dòng vật tư STT "
+                        + (line.getLineNo() != null ? line.getLineNo() : "?")
+                        + " (id dòng YC="
+                        + line.getId()
+                        + "): chưa có mã hàng — không thể kiểm tra tồn kho khi hoàn thành.",
+                    ENTITY_NAME,
+                    "consumableitemrequired"
+                );
+            }
+            Long itemId = line.getAssetItem().getId();
+            demandByAssetItemId.merge(itemId, qty, Integer::sum);
+        }
+        for (Map.Entry<Long, Integer> entry : demandByAssetItemId.entrySet()) {
+            Long itemId = entry.getKey();
+            int need = entry.getValue();
+            String itemLabel = labelConsumableAssetItem(itemId);
+            List<ConsumableStock> stocks = consumableStockRepository.findAllByAssetItem_Id(itemId);
+            if (stocks.isEmpty()) {
+                throw new BadRequestAlertException(
+                    "Chưa có bản ghi tồn kho cho vật tư: "
+                        + itemLabel
+                        + ". Vào Tồn kho vật tư / nhập kho cho mã này trước khi hoàn thành cấp phát.",
+                    ENTITY_NAME,
+                    "nostock"
+                );
+            }
+            int onHand = stocks.stream().mapToInt(s -> s.getQuantityOnHand() != null ? s.getQuantityOnHand() : 0).sum();
+            if (onHand < need) {
+                throw new BadRequestAlertException(
+                    "Không đủ tồn kho vật tư — "
+                        + itemLabel
+                        + ". Cần xuất: "
+                        + need
+                        + ", hiện tồn kho: "
+                        + onHand
+                        + ". Nhập thêm hoặc giảm số lượng trên phiếu.",
                     ENTITY_NAME,
                     "insufficientstock"
                 );
@@ -161,11 +269,55 @@ public class AllocationRequestService {
         }
     }
 
+    /**
+     * Trừ tồn kho vật tư trên một hoặc nhiều bản ghi consumable_stock cùng mã (FIFO theo id).
+     */
+    private void deductConsumableStockForLine(Long assetItemId, int qty, AssetItem lineAssetItem) {
+        List<ConsumableStock> rows = new ArrayList<>(consumableStockRepository.findAllByAssetItem_Id(assetItemId));
+        if (rows.isEmpty()) {
+            getOrCreateConsumableStockForItem(assetItemId, lineAssetItem);
+            rows = new ArrayList<>(consumableStockRepository.findAllByAssetItem_Id(assetItemId));
+        }
+        int totalOnHand = rows.stream().mapToInt(s -> s.getQuantityOnHand() != null ? s.getQuantityOnHand() : 0).sum();
+        if (totalOnHand < qty) {
+            throw new BadRequestAlertException(
+                "Không đủ tồn kho vật tư — "
+                    + labelConsumableAssetItem(assetItemId)
+                    + ". Cần xuất: "
+                    + qty
+                    + ", hiện tồn kho: "
+                    + totalOnHand
+                    + ".",
+                ENTITY_NAME,
+                "insufficientstock"
+            );
+        }
+        int remaining = qty;
+        rows.sort(Comparator.comparing(ConsumableStock::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+        for (ConsumableStock st : rows) {
+            if (remaining <= 0) {
+                break;
+            }
+            int oh = st.getQuantityOnHand() != null ? st.getQuantityOnHand() : 0;
+            if (oh == 0) {
+                continue;
+            }
+            int take = Math.min(oh, remaining);
+            st.setQuantityOnHand(oh - take);
+            int issued = st.getQuantityIssued() != null ? st.getQuantityIssued() : 0;
+            st.setQuantityIssued(issued + take);
+            consumableStockRepository.save(st);
+            remaining -= take;
+        }
+    }
+
     private void validateAllDeviceLinesHaveEquipment(Long allocationRequestId) {
         for (AllocationRequestLine line : allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId)) {
             if (line.getLineType() == AssetManagementType.DEVICE && line.getEquipment() == null) {
                 throw new BadRequestAlertException(
-                    "Mỗi dòng thiết bị phải chọn thiết bị tồn kho trước khi duyệt / hoàn thành",
+                    "Thiếu thiết bị tồn kho — "
+                        + labelDeviceRequestLine(line)
+                        + ". Vào chi tiết yêu cầu cấp phát, cột «Chọn tài sản», chọn thiết bị còn tồn kho cho từng dòng trước khi hoàn thành.",
                     ENTITY_NAME,
                     "equipmentrequired"
                 );
@@ -173,7 +325,44 @@ public class AllocationRequestService {
         }
     }
 
-    private void assertExportSlipTransitionAllowed(AllocationRequestStatus oldStatus, AllocationRequestStatus newStatus) {
+    /**
+     * Cùng một thiết bị không được gán cho nhiều dòng DEVICE trong một YC — nếu không, dòng đầu tạo bàn giao
+     * rồi dòng sau sẽ gặp {@code equipmentbusy} khó hiểu.
+     */
+    private void validateUniqueDeviceEquipmentPerRequest(Long allocationRequestId) {
+        Set<Long> seen = new HashSet<>();
+        for (AllocationRequestLine line : allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId)) {
+            if (line.getLineType() != AssetManagementType.DEVICE) {
+                continue;
+            }
+            if (line.getEquipment() == null || line.getEquipment().getId() == null) {
+                continue;
+            }
+            Long eqId = line.getEquipment().getId();
+            if (!seen.add(eqId)) {
+                String eqPart = equipmentRepository
+                    .findById(eqId)
+                    .map(this::labelEquipmentBrief)
+                    .orElse("id TB=" + eqId);
+                throw new BadRequestAlertException(
+                    "Trùng thiết bị trên hai dòng trong cùng phiếu — "
+                        + eqPart
+                        + ". Hãy chọn hai thiết bị (serial/mã) khác nhau.",
+                    ENTITY_NAME,
+                    "duplicateequipmentline"
+                );
+            }
+        }
+    }
+
+    /**
+     * Chuyển sang EXPORT_SLIP_CREATED: chỉ từ APPROVED; kiểm tra đủ TB/mã VT và tồn kho (bàn giao + trừ tồn thực hiện ngay sau bước này).
+     */
+    private void assertExportSlipTransitionAllowed(
+        AllocationRequestStatus oldStatus,
+        AllocationRequestStatus newStatus,
+        Long requestId
+    ) {
         if (newStatus != AllocationRequestStatus.EXPORT_SLIP_CREATED) {
             return;
         }
@@ -187,27 +376,25 @@ public class AllocationRequestService {
                 "exportslipnotapproved"
             );
         }
+        if (requestId != null) {
+            validateAllDeviceLinesHaveEquipment(requestId);
+            validateUniqueDeviceEquipmentPerRequest(requestId);
+            validateConsumableLinesSufficientStock(requestId);
+        }
     }
 
-    private void assertAllocationCompletionAllowed(
-        AllocationRequestStatus oldStatus,
-        AllocationRequestStatus newStatus,
-        Long requestId
-    ) {
+    /** Hoàn thành: chỉ sau khi đã xuất cấp phát (bàn giao/trừ tồn đã chạy ở bước phiếu xuất). */
+    private void assertAllocationCompletionAllowed(AllocationRequestStatus oldStatus, AllocationRequestStatus newStatus) {
         if (newStatus != AllocationRequestStatus.COMPLETED || oldStatus == AllocationRequestStatus.COMPLETED) {
             return;
         }
-        if (
-            oldStatus != AllocationRequestStatus.APPROVED && oldStatus != AllocationRequestStatus.EXPORT_SLIP_CREATED
-        ) {
+        if (oldStatus != AllocationRequestStatus.EXPORT_SLIP_CREATED) {
             throw new BadRequestAlertException(
-                "Chỉ hoàn thành cấp phát khi đã duyệt (APPROVED) hoặc đã ghi nhận phiếu xuất (EXPORT_SLIP_CREATED)",
+                "Chỉ được hoàn thành sau khi đã ghi nhận xuất cấp phát (Đã tạo phiếu xuất). Không hoàn thành trực tiếp từ Đã duyệt.",
                 ENTITY_NAME,
                 "notready"
             );
         }
-        validateAllDeviceLinesHaveEquipment(requestId);
-        validateConsumableLinesSufficientStock(requestId);
     }
 
     private void defaultAssigneeFields(AllocationRequest ar) {
@@ -330,11 +517,11 @@ public class AllocationRequestService {
     }
 
     /**
-     * Ghi nhận bàn giao thiết bị / xuất vật tư theo dòng YC khi chuyển sang COMPLETED.
+     * Ghi nhận bàn giao thiết bị / trừ tồn vật tư khi chuyển sang EXPORT_SLIP_CREATED (cùng lúc với phiếu xuất).
      */
-    private void applyAllocationCompletion(Long allocationRequestId) {
+    private void applyAllocationPhysicalIssue(Long allocationRequestId) {
         AllocationRequest ar = allocationRequestRepository.findOneWithEagerRelationships(allocationRequestId).orElse(null);
-        if (ar == null || ar.getStatus() != AllocationRequestStatus.COMPLETED) {
+        if (ar == null || ar.getStatus() != AllocationRequestStatus.EXPORT_SLIP_CREATED) {
             return;
         }
         if (ar.getRequester() == null || ar.getRequester().getId() == null) {
@@ -355,27 +542,87 @@ public class AllocationRequestService {
                 : "Cấp phát từ " + noteSuffix;
 
         List<AllocationRequestLine> lines = allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId);
+        validateUniqueDeviceEquipmentPerRequest(allocationRequestId);
         for (AllocationRequestLine line : lines) {
             if (line.getLineType() == AssetManagementType.DEVICE) {
                 if (line.getEquipment() == null || line.getEquipment().getId() == null) {
                     continue;
                 }
                 Long eqId = line.getEquipment().getId();
-                if (
-                    equipmentAssignmentRepository.findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(eqId).isPresent()
-                ) {
-                    throw new BadRequestAlertException(
-                        "Thiết bị đã đang được bàn giao — không cấp trùng",
-                        ENTITY_NAME,
-                        "equipmentbusy"
+                Equipment eq = equipmentRepository
+                    .findById(eqId)
+                    .orElseThrow(() ->
+                        new BadRequestAlertException(
+                            "Không tìm thấy thiết bị id TB="
+                                + eqId
+                                + " trên "
+                                + labelDeviceRequestLine(line)
+                                + " — dữ liệu có thể đã bị xóa hoặc sai id.",
+                            ENTITY_NAME,
+                            "eqnotfound"
+                        )
                     );
-                }
-                Equipment eq = equipmentRepository.findById(eqId).orElseThrow(() ->
-                    new BadRequestAlertException("Không tìm thấy thiết bị", ENTITY_NAME, "eqnotfound")
+                Optional<EquipmentAssignment> existingOpen = equipmentAssignmentRepository.findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(
+                    eqId
                 );
+                if (existingOpen.isPresent()) {
+                    EquipmentAssignment ea = existingOpen.get();
+                    String existingNote = ea.getNote();
+                    if (existingNote != null && existingNote.contains(noteSuffix)) {
+                        LOG.debug(
+                            "Equipment {} already has open assignment for this allocation (note contains {}) — idempotent skip",
+                            eqId,
+                            noteSuffix
+                        );
+                        continue;
+                    }
+                    // Đóng mọi bàn giao mở (kể cả IN_USE: thường là bàn giao cũ chưa đóng trả / lệch với trạng thái TB)
+                    while (true) {
+                        Optional<EquipmentAssignment> open = equipmentAssignmentRepository.findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(
+                            eqId
+                        );
+                        if (open.isEmpty()) {
+                            break;
+                        }
+                        EquipmentAssignment a = open.get();
+                        a.setReturnedDate(today);
+                        equipmentAssignmentRepository.save(a);
+                        equipmentAssignmentRepository.flush();
+                        LOG.warn(
+                            "Closed open equipment_assignment id={} for equipment id={} during allocation completion",
+                            a.getId(),
+                            eqId
+                        );
+                    }
+                    eq = equipmentRepository
+                        .findById(eqId)
+                        .orElseThrow(() ->
+                            new BadRequestAlertException(
+                                "Không tìm thấy thiết bị id TB="
+                                    + eqId
+                                    + " (sau khi xử lý bàn giao) — "
+                                    + labelDeviceRequestLine(line),
+                                ENTITY_NAME,
+                                "eqnotfound"
+                            )
+                        );
+                    if (eq.getStatus() == EquipmentOperationalStatus.IN_USE) {
+                        eq.setStatus(EquipmentOperationalStatus.IN_STOCK);
+                        equipmentRepository.save(eq);
+                        LOG.warn(
+                            "Normalized equipment id={} from IN_USE to IN_STOCK after closing open assignments (allocation completion)",
+                            eqId
+                        );
+                    }
+                }
                 if (eq.getStatus() != EquipmentOperationalStatus.IN_STOCK) {
                     throw new BadRequestAlertException(
-                        "Thiết bị không ở trạng thái tồn kho (IN_STOCK)",
+                        labelDeviceRequestLine(line)
+                            + ": thiết bị "
+                            + labelEquipmentBrief(eq)
+                            + " không ở trạng thái tồn kho (IN_STOCK); hiện tại: "
+                            + eq.getStatus()
+                            + ". Kiểm tra bàn giao mở / trạng thái thiết bị trước khi hoàn thành.",
                         ENTITY_NAME,
                         "notinstock"
                     );
@@ -399,19 +646,7 @@ public class AllocationRequestService {
                     continue;
                 }
                 Long itemId = line.getAssetItem().getId();
-                ConsumableStock stock = getOrCreateConsumableStockForItem(itemId, line.getAssetItem());
-                int onHand = stock.getQuantityOnHand() != null ? stock.getQuantityOnHand() : 0;
-                if (onHand < qty) {
-                    throw new BadRequestAlertException(
-                        "Không đủ tồn kho (cần " + qty + ", hiện " + onHand + ")",
-                        ENTITY_NAME,
-                        "insufficientstock"
-                    );
-                }
-                stock.setQuantityOnHand(onHand - qty);
-                int issued = stock.getQuantityIssued() != null ? stock.getQuantityIssued() : 0;
-                stock.setQuantityIssued(issued + qty);
-                consumableStockRepository.save(stock);
+                deductConsumableStockForLine(itemId, qty, line.getAssetItem());
 
                 ConsumableAssignment ca = new ConsumableAssignment();
                 ca.setQuantity(qty);
@@ -426,10 +661,10 @@ public class AllocationRequestService {
             }
         }
         appAuditLogService.recordBusiness(
-            "ALLOCATION_COMPLETED",
+            "ALLOCATION_EXPORT_PHYSICAL",
             "requestId=" + allocationRequestId + " code=" + code
         );
-        LOG.debug("Applied allocation completion for request {}", allocationRequestId);
+        LOG.debug("Applied allocation physical issue (export slip) for request {}", allocationRequestId);
     }
 
     private String buildUniqueStockIssueCode(Long allocationRequestId) {
@@ -477,6 +712,15 @@ public class AllocationRequestService {
         issue.setDepartment(targets.department());
         issue.setLocation(targets.location());
         issue = stockIssueRepository.save(issue);
+        if (issue.getId() != null) {
+            stockDocumentEventService.record(
+                StockDocumentEventService.DOC_ISSUE,
+                issue.getId(),
+                "CREATE",
+                "Tạo phiếu xuất " + issue.getCode() + " (theo YC cấp phát)",
+                "allocationRequestId=" + allocationRequestId + ", status=" + issue.getStatus()
+            );
+        }
 
         List<AllocationRequestLine> lines = allocationRequestLineRepository.findAllByRequest_Id(allocationRequestId);
         for (AllocationRequestLine line : lines) {
@@ -574,18 +818,14 @@ public class AllocationRequestService {
         AllocationRequest allocationRequest = allocationRequestMapper.toEntity(allocationRequestDTO);
         defaultAssigneeFields(allocationRequest);
         assertBeneficiaryStructure(allocationRequest);
-        assertExportSlipTransitionAllowed(oldStatus, allocationRequest.getStatus());
-        assertAllocationCompletionAllowed(oldStatus, allocationRequest.getStatus(), id);
+        assertExportSlipTransitionAllowed(oldStatus, allocationRequest.getStatus(), id);
+        assertAllocationCompletionAllowed(oldStatus, allocationRequest.getStatus());
         validateDeviceLinesPickedIfApproving(allocationRequest);
+        assertRejectionReasonWhenRejected(oldStatus, allocationRequest.getStatus(), allocationRequest.getRejectionReason());
         final AllocationRequest savedAr = allocationRequestRepository.save(allocationRequest);
         if (oldStatus == AllocationRequestStatus.APPROVED && savedAr.getStatus() == AllocationRequestStatus.EXPORT_SLIP_CREATED) {
             ensureStockIssueForExportSlip(savedAr.getId());
-        }
-        if (
-            savedAr.getStatus() == AllocationRequestStatus.COMPLETED &&
-            oldStatus != AllocationRequestStatus.COMPLETED
-        ) {
-            applyAllocationCompletion(savedAr.getId());
+            applyAllocationPhysicalIssue(savedAr.getId());
         }
         return allocationRequestRepository
             .findOneWithEagerRelationships(savedAr.getId())
@@ -640,18 +880,18 @@ public class AllocationRequestService {
                 allocationRequestMapper.partialUpdate(existingAllocationRequest, allocationRequestDTO);
                 defaultAssigneeFields(existingAllocationRequest);
                 assertBeneficiaryStructure(existingAllocationRequest);
-                assertExportSlipTransitionAllowed(oldStatus, existingAllocationRequest.getStatus());
-                assertAllocationCompletionAllowed(oldStatus, existingAllocationRequest.getStatus(), existingAllocationRequest.getId());
+                assertExportSlipTransitionAllowed(oldStatus, existingAllocationRequest.getStatus(), existingAllocationRequest.getId());
+                assertAllocationCompletionAllowed(oldStatus, existingAllocationRequest.getStatus());
                 validateDeviceLinesPickedIfApproving(existingAllocationRequest);
+                assertRejectionReasonWhenRejected(
+                    oldStatus,
+                    existingAllocationRequest.getStatus(),
+                    existingAllocationRequest.getRejectionReason()
+                );
                 AllocationRequest saved = allocationRequestRepository.save(existingAllocationRequest);
                 if (oldStatus == AllocationRequestStatus.APPROVED && saved.getStatus() == AllocationRequestStatus.EXPORT_SLIP_CREATED) {
                     ensureStockIssueForExportSlip(saved.getId());
-                }
-                if (
-                    saved.getStatus() == AllocationRequestStatus.COMPLETED &&
-                    oldStatus != AllocationRequestStatus.COMPLETED
-                ) {
-                    applyAllocationCompletion(saved.getId());
+                    applyAllocationPhysicalIssue(saved.getId());
                 }
                 return saved;
             })
@@ -737,7 +977,8 @@ public class AllocationRequestService {
             d.getCode() != null ||
             d.getRequester() != null ||
             d.getStockIssueId() != null ||
-            d.getStockIssueCode() != null
+            d.getStockIssueCode() != null ||
+            d.getRejectionReason() != null
         );
     }
 
@@ -752,7 +993,20 @@ public class AllocationRequestService {
             d.getBeneficiaryLocation() != null ||
             d.getStockIssueId() != null ||
             d.getStockIssueCode() != null ||
-            d.getStatus() != null
+            d.getStatus() != null ||
+            d.getRejectionReason() != null
         );
+    }
+
+    private static void assertRejectionReasonWhenRejected(
+        AllocationRequestStatus oldStatus,
+        AllocationRequestStatus newStatus,
+        String rejectionReason
+    ) {
+        if (oldStatus == AllocationRequestStatus.PENDING && newStatus == AllocationRequestStatus.REJECTED) {
+            if (rejectionReason == null || rejectionReason.isBlank()) {
+                throw new BadRequestAlertException("Cần nhập lý do từ chối", ENTITY_NAME, "rejectionreason");
+            }
+        }
     }
 }

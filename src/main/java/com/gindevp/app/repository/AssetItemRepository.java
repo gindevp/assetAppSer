@@ -1,6 +1,7 @@
 package com.gindevp.app.repository;
 
 import com.gindevp.app.domain.AssetItem;
+import com.gindevp.app.domain.enumeration.AssetManagementType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface AssetItemRepository extends JpaRepository<AssetItem, Long>, JpaSpecificationExecutor<AssetItem> {
+    List<AssetItem> findByAssetLine_IdAndManagementType(Long assetLineId, AssetManagementType managementType);
+
     default Optional<AssetItem> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);
     }

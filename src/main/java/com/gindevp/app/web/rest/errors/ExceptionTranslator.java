@@ -193,6 +193,12 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
 
     private String getCustomizedTitle(Throwable err) {
         if (err instanceof MethodArgumentNotValidException) return "Method argument not valid";
+        /** Giữ nguyên title do BadRequestAlertException đặt (thông báo tiếng Việt cho người dùng). */
+        if (err instanceof BadRequestAlertException bre && bre.getBody() instanceof ProblemDetailWithCause pdc) {
+            if (StringUtils.isNotBlank(pdc.getTitle())) {
+                return pdc.getTitle();
+            }
+        }
         return null;
     }
 

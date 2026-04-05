@@ -15,6 +15,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ConsumableStockRepository extends JpaRepository<ConsumableStock, Long> {
     Optional<ConsumableStock> findFirstByAssetItem_Id(Long assetItemId);
+
+    /** Cùng mã vật tư có thể có nhiều bản ghi (dữ liệu cũ / nhập nhiều lần) — cộng tồn khi kiểm tra & trừ kho. */
+    List<ConsumableStock> findAllByAssetItem_Id(Long assetItemId);
     default Optional<ConsumableStock> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);
     }

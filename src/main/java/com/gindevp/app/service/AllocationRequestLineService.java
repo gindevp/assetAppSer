@@ -4,6 +4,7 @@ import com.gindevp.app.domain.AllocationRequestLine;
 import com.gindevp.app.domain.enumeration.AllocationRequestStatus;
 import com.gindevp.app.domain.enumeration.AssetManagementType;
 import com.gindevp.app.repository.AllocationRequestLineRepository;
+import com.gindevp.app.repository.AssetItemRepository;
 import com.gindevp.app.repository.AllocationRequestRepository;
 import com.gindevp.app.service.dto.AllocationRequestLineDTO;
 import com.gindevp.app.service.mapper.AllocationRequestLineMapper;
@@ -83,10 +84,16 @@ public class AllocationRequestLineService {
                 line.setAssetItem(null);
             }
         } else if (line.getLineType() == AssetManagementType.CONSUMABLE) {
-            if (line.getAssetItem() == null || line.getAssetItem().getId() == null) {
-                throw new BadRequestAlertException("Dòng vật tư phải chọn mã tài sản (item)", ENTITY_NAME, "consumablerequiresitem");
+            boolean hasItem = line.getAssetItem() != null && line.getAssetItem().getId() != null;
+            boolean hasLine = line.getAssetLine() != null && line.getAssetLine().getId() != null;
+            if (!hasItem && !hasLine) {
+                throw new BadRequestAlertException(
+                    "Dòng vật tư phải chọn dòng vật tư hoặc mã mặt hàng",
+                    ENTITY_NAME,
+                    "consumablerequiresitemorline"
+                );
             }
-            line.setAssetLine(null);
+            /** Mã vật tư cụ thể do QLTS chọn khi duyệt (PATCH assetItem), không suy tự động khi tạo YC. */
         }
     }
 
@@ -138,7 +145,7 @@ public class AllocationRequestLineService {
             .findById(allocationRequestLineDTO.getId())
             .map(existingAllocationRequestLine -> {
                 allocationRequestLineMapper.partialUpdate(existingAllocationRequestLine, allocationRequestLineDTO);
-
+                assertLineReferences(existingAllocationRequestLine);
                 return existingAllocationRequestLine;
             })
             .map(allocationRequestLineRepository::save)

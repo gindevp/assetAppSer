@@ -37,6 +37,10 @@ public class RepairRequestDTO implements Serializable {
     private RepairRequestStatus status;
 
     @Size(max = 2000)
+    @Schema(description = "Lý do từ chối (khi từ chối yêu cầu)")
+    private String rejectionReason;
+
+    @Size(max = 2000)
     private String resolutionNote;
 
     private RepairResolution repairOutcome;
@@ -99,6 +103,14 @@ public class RepairRequestDTO implements Serializable {
 
     public void setStatus(RepairRequestStatus status) {
         this.status = status;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public String getResolutionNote() {
@@ -165,6 +177,7 @@ public class RepairRequestDTO implements Serializable {
             ", description='" + getDescription() + "'" +
             ", attachmentNote='" + getAttachmentNote() + "'" +
             ", status='" + getStatus() + "'" +
+            ", rejectionReason='" + getRejectionReason() + "'" +
             ", resolutionNote='" + getResolutionNote() + "'" +
             ", requester=" + getRequester() +
             ", equipment=" + getEquipment() +

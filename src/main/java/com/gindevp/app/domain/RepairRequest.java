@@ -51,6 +51,11 @@ public class RepairRequest implements Serializable {
     @Column(name = "status", nullable = false)
     private RepairRequestStatus status;
 
+    /** Lý do từ chối (khi status = REJECTED) */
+    @Size(max = 2000)
+    @Column(name = "rejection_reason", length = 2000)
+    private String rejectionReason;
+
     @Size(max = 2000)
     @Column(name = "resolution_note", length = 2000)
     private String resolutionNote;
@@ -160,6 +165,19 @@ public class RepairRequest implements Serializable {
         this.status = status;
     }
 
+    public String getRejectionReason() {
+        return this.rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public RepairRequest rejectionReason(String rejectionReason) {
+        this.setRejectionReason(rejectionReason);
+        return this;
+    }
+
     public String getResolutionNote() {
         return this.resolutionNote;
     }
@@ -237,6 +255,7 @@ public class RepairRequest implements Serializable {
             ", description='" + getDescription() + "'" +
             ", attachmentNote='" + getAttachmentNote() + "'" +
             ", status='" + getStatus() + "'" +
+            ", rejectionReason='" + getRejectionReason() + "'" +
             ", resolutionNote='" + getResolutionNote() + "'" +
             ", repairOutcome='" + getRepairOutcome() + "'" +
             "}";

@@ -42,6 +42,11 @@ public class AllocationRequest implements Serializable {
     @Column(name = "attachment_note", length = 2000)
     private String attachmentNote;
 
+    /** Lý do từ chối (khi status = REJECTED) */
+    @Size(max = 2000)
+    @Column(name = "rejection_reason", length = 2000)
+    private String rejectionReason;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -141,6 +146,19 @@ public class AllocationRequest implements Serializable {
 
     public AllocationRequest attachmentNote(String attachmentNote) {
         this.setAttachmentNote(attachmentNote);
+        return this;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public AllocationRequest rejectionReason(String rejectionReason) {
+        this.setRejectionReason(rejectionReason);
         return this;
     }
 
@@ -276,6 +294,7 @@ public class AllocationRequest implements Serializable {
             ", requestDate='" + getRequestDate() + "'" +
             ", reason='" + getReason() + "'" +
             ", attachmentNote='" + getAttachmentNote() + "'" +
+            ", rejectionReason='" + getRejectionReason() + "'" +
             ", status='" + getStatus() + "'" +
             ", beneficiaryNote='" + getBeneficiaryNote() + "'" +
             ", assigneeType='" + getAssigneeType() + "'" +
