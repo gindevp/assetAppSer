@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="20260404120000-1" author="app">
+        <addColumn tableName="allocation_request">
+            <column name="rejection_reason" type="varchar(2000)"/>
+        </addColumn>
+    </changeSet>
+    <changeSet id="20260404120000-2" author="app">
+        <addColumn tableName="repair_request">
+            <column name="rejection_reason" type="varchar(2000)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>
