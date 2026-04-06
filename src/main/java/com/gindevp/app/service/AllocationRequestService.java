@@ -413,6 +413,30 @@ public class AllocationRequestService {
         }
     }
 
+    /**
+     * Điều phối phòng ban tạo YC «cấp phát phòng ban»: người nhận tài sản là chính điều phối — không cần QLTS chọn thêm.
+     */
+    private void defaultBeneficiaryEmployeeForCoordinatorDepartmentRequest(AllocationRequest ar) {
+        if (ar.getAssigneeType() != AssigneeType.DEPARTMENT) {
+            return;
+        }
+        if (ar.getBeneficiaryEmployee() != null && ar.getBeneficiaryEmployee().getId() != null) {
+            return;
+        }
+        if (ar.getRequester() == null || ar.getRequester().getId() == null) {
+            return;
+        }
+        if (currentEmployeeService.isAssetManagerOrAdmin()) {
+            return;
+        }
+        if (!SecurityUtils.hasCurrentUserThisAuthority(AuthoritiesConstants.DEPARTMENT_COORDINATOR)) {
+            return;
+        }
+        Employee ref = new Employee();
+        ref.setId(ar.getRequester().getId());
+        ar.setBeneficiaryEmployee(ref);
+    }
+
     private void assertBeneficiaryStructure(AllocationRequest ar) {
         AssigneeType at = ar.getAssigneeType();
         if (at == null) {
@@ -473,6 +497,32 @@ public class AllocationRequestService {
             throw new AccessDeniedException("Nhân viên chỉ được xin cấp phát cho chính mình");
         }
 
+        if (at == AssigneeType.DEPARTMENT && ar.getBeneficiaryEmployee() != null && ar.getBeneficiaryEmployee().getId() != null) {
+            if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+                Long bid = ar.getBeneficiaryEmployee().getId();
+                Long rid = ar.getRequester() != null ? ar.getRequester().getId() : null;
+                if (!Objects.equals(bid, rid)) {
+                    throw new BadRequestAlertException(
+                        "YC cấp phát theo phòng ban: người nhận tài sản phải là điều phối tạo yêu cầu.",
+                        ENTITY_NAME,
+                        "deptbatchbeneficiary"
+                    );
+                }
+                Employee be = employeeRepository
+                    .findOneWithToOneRelationships(bid)
+                    .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy nhân viên nhận", ENTITY_NAME, "noben"));
+                Long bdId = ar.getBeneficiaryDepartment() != null ? ar.getBeneficiaryDepartment().getId() : null;
+                if (
+                    bdId != null &&
+                    be.getDepartment() != null &&
+                    be.getDepartment().getId() != null &&
+                    !Objects.equals(be.getDepartment().getId(), bdId)
+                ) {
+                    throw new BadRequestAlertException("Người nhận phải thuộc phòng ban nhận.", ENTITY_NAME, "bendeptmismatch");
+                }
+            }
+        }
+
         if (!coordinator) {
             throw new AccessDeniedException(
                 "Chỉ điều phối phòng ban hoặc QLTS được xin cấp cho phòng ban / vị trí / toàn công ty"
@@ -495,12 +545,21 @@ public class AllocationRequestService {
                 yield new AssignmentTargets(be, be.getDepartment(), null);
             }
             case DEPARTMENT -> {
-                Long id = ar.getBeneficiaryDepartment().getId();
+                Long deptId = ar.getBeneficiaryDepartment().getId();
                 Department d = departmentRepository
-                    .findById(id)
+                    .findById(deptId)
                     .orElseThrow(() ->
                         new BadRequestAlertException("Không tìm thấy phòng ban nhận", ENTITY_NAME, "deptnotfound")
                     );
+                if (ar.getBeneficiaryEmployee() != null && ar.getBeneficiaryEmployee().getId() != null) {
+                    Long empId = ar.getBeneficiaryEmployee().getId();
+                    Employee emp = employeeRepository
+                        .findOneWithToOneRelationships(empId)
+                        .orElseThrow(() ->
+                            new BadRequestAlertException("Không tìm thấy nhân viên nhận", ENTITY_NAME, "beneficiarynotfound")
+                        );
+                    yield new AssignmentTargets(emp, d, null);
+                }
                 yield new AssignmentTargets(null, d, null);
             }
             case LOCATION -> {
@@ -793,6 +852,7 @@ public class AllocationRequestService {
         }
         AllocationRequest allocationRequest = allocationRequestMapper.toEntity(allocationRequestDTO);
         defaultAssigneeFields(allocationRequest);
+        defaultBeneficiaryEmployeeForCoordinatorDepartmentRequest(allocationRequest);
         assertBeneficiaryStructure(allocationRequest);
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
             assertBeneficiaryAllowedForCurrentUser(allocationRequest);
