@@ -22,6 +22,8 @@ public interface RepairRequestLineMapper extends EntityMapper<RepairRequestLineD
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "equipmentCode", source = "equipmentCode")
+    @Mapping(target = "serial", source = "serial")
+    @Mapping(target = "assetItem", source = "assetItem", qualifiedByName = "lineAssetItemBrief")
     EquipmentDTO toDtoEquipmentEquipmentCode(Equipment equipment);
 
     @Named("lineAssetItemBrief")

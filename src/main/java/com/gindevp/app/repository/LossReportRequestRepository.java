@@ -1,7 +1,9 @@
 package com.gindevp.app.repository;
 
 import com.gindevp.app.domain.LossReportRequest;
+import com.gindevp.app.domain.enumeration.LossReportKind;
 import com.gindevp.app.domain.enumeration.LossReportRequestStatus;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
@@ -13,6 +15,8 @@ public interface LossReportRequestRepository extends JpaRepository<LossReportReq
     boolean existsByEquipment_IdAndStatus(Long equipmentId, LossReportRequestStatus status);
 
     boolean existsByConsumableAssignment_IdAndStatus(Long consumableAssignmentId, LossReportRequestStatus status);
+
+    List<LossReportRequest> findByStatusAndLossKind(LossReportRequestStatus status, LossReportKind lossKind);
 
     Page<LossReportRequest> findByRequester_Id(Long requesterId, Pageable pageable);
 

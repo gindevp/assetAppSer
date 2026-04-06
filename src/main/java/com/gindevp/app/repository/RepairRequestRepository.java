@@ -37,6 +37,7 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
             "left join fetch repairRequest.equipment " +
             "left join fetch repairRequest.lines lines " +
             "left join fetch lines.equipment " +
+            "left join fetch lines.equipment.assetItem " +
             "left join fetch lines.assetItem",
         countQuery = "select count(repairRequest) from RepairRequest repairRequest"
     )
@@ -49,6 +50,7 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
             "left join fetch repairRequest.equipment " +
             "left join fetch repairRequest.lines lines " +
             "left join fetch lines.equipment " +
+            "left join fetch lines.equipment.assetItem " +
             "left join fetch lines.assetItem"
     )
     List<RepairRequest> findAllWithToOneRelationships();
@@ -60,6 +62,7 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
             "left join fetch repairRequest.equipment " +
             "left join fetch repairRequest.lines lines " +
             "left join fetch lines.equipment " +
+            "left join fetch lines.equipment.assetItem " +
             "left join fetch lines.assetItem where repairRequest.id =:id"
     )
     Optional<RepairRequest> findOneWithToOneRelationships(@Param("id") Long id);

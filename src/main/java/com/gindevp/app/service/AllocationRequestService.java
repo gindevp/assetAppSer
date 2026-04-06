@@ -576,6 +576,38 @@ public class AllocationRequestService {
     }
 
     /**
+     * Cùng mặt hàng + cùng đối tượng bàn giao → cộng dồn vào một dòng {@link ConsumableAssignment} (tránh trùng).
+     */
+    private Optional<ConsumableAssignment> findExistingConsumableAssignmentForTarget(AssignmentTargets targets, Long assetItemId) {
+        if (targets.employee() != null) {
+            List<ConsumableAssignment> list = consumableAssignmentRepository.findByEmployee_IdAndAssetItem_IdOrderByIdAsc(
+                targets.employee().getId(),
+                assetItemId
+            );
+            return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+        }
+        if (targets.department() != null && targets.employee() == null) {
+            List<ConsumableAssignment> list =
+                consumableAssignmentRepository.findByDepartment_IdAndAssetItem_IdAndEmployeeIsNullOrderByIdAsc(
+                    targets.department().getId(),
+                    assetItemId
+                );
+            return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+        }
+        if (targets.location() != null && targets.employee() == null && targets.department() == null) {
+            List<ConsumableAssignment> list =
+                consumableAssignmentRepository.findByLocation_IdAndAssetItem_IdAndEmployeeIsNullAndDepartmentIsNullOrderByIdAsc(
+                    targets.location().getId(),
+                    assetItemId
+                );
+            return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+        }
+        List<ConsumableAssignment> list =
+            consumableAssignmentRepository.findByAssetItem_IdAndEmployeeIsNullAndDepartmentIsNullAndLocationIsNullOrderByIdAsc(assetItemId);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    /**
      * Ghi nhận bàn giao thiết bị / trừ tồn vật tư khi chuyển sang EXPORT_SLIP_CREATED (cùng lúc với phiếu xuất).
      */
     private void applyAllocationPhysicalIssue(Long allocationRequestId) {
@@ -707,16 +739,30 @@ public class AllocationRequestService {
                 Long itemId = line.getAssetItem().getId();
                 deductConsumableStockForLine(itemId, qty, line.getAssetItem());
 
-                ConsumableAssignment ca = new ConsumableAssignment();
-                ca.setQuantity(qty);
-                ca.setAssignedDate(today);
-                ca.setReturnedQuantity(0);
-                ca.setAssetItem(line.getAssetItem());
-                ca.setEmployee(targets.employee());
-                ca.setDepartment(targets.department());
-                ca.setLocation(targets.location());
-                ca.setNote(noteSuffix);
-                consumableAssignmentRepository.save(ca);
+                Optional<ConsumableAssignment> existingOpt = findExistingConsumableAssignmentForTarget(targets, itemId);
+                if (existingOpt.isPresent()) {
+                    ConsumableAssignment ca = existingOpt.get();
+                    int prev = ca.getQuantity() != null ? ca.getQuantity() : 0;
+                    ca.setQuantity(prev + qty);
+                    String oldNote = ca.getNote();
+                    if (oldNote != null && !oldNote.isBlank()) {
+                        ca.setNote(oldNote + "; " + noteSuffix);
+                    } else {
+                        ca.setNote(noteSuffix);
+                    }
+                    consumableAssignmentRepository.save(ca);
+                } else {
+                    ConsumableAssignment ca = new ConsumableAssignment();
+                    ca.setQuantity(qty);
+                    ca.setAssignedDate(today);
+                    ca.setReturnedQuantity(0);
+                    ca.setAssetItem(line.getAssetItem());
+                    ca.setEmployee(targets.employee());
+                    ca.setDepartment(targets.department());
+                    ca.setLocation(targets.location());
+                    ca.setNote(noteSuffix);
+                    consumableAssignmentRepository.save(ca);
+                }
             }
         }
         appAuditLogService.recordBusiness(

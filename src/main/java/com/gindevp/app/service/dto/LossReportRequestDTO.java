@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 @Schema(description = "Yêu cầu báo mất tài sản đang giữ")
@@ -48,6 +49,9 @@ public class LossReportRequestDTO implements Serializable {
 
     /** Chỉ id + mã item khi hiển thị list */
     private ConsumableAssignmentRefDTO consumableAssignment;
+
+    /** Khi lossKind = COMBINED: các dòng thiết bị / vật tư (POST/GET). */
+    private List<LossReportEntryLineDTO> lossEntries;
 
     public Long getId() {
         return id;
@@ -151,6 +155,14 @@ public class LossReportRequestDTO implements Serializable {
 
     public void setConsumableAssignment(ConsumableAssignmentRefDTO consumableAssignment) {
         this.consumableAssignment = consumableAssignment;
+    }
+
+    public List<LossReportEntryLineDTO> getLossEntries() {
+        return lossEntries;
+    }
+
+    public void setLossEntries(List<LossReportEntryLineDTO> lossEntries) {
+        this.lossEntries = lossEntries;
     }
 
     @Override

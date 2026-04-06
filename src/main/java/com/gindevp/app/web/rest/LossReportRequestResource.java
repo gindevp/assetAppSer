@@ -96,4 +96,13 @@ public class LossReportRequestResource {
         Optional<LossReportRequestDTO> dto = lossReportRequestService.findOne(id);
         return ResponseUtil.wrapOrNotFound(dto);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteLossReportRequest(@PathVariable Long id) {
+        LOG.debug("REST request to delete LossReportRequest : {}", id);
+        lossReportRequestService.delete(id);
+        return ResponseEntity.noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
+            .build();
+    }
 }

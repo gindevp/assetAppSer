@@ -80,6 +80,11 @@ public class LossReportRequest implements Serializable {
     @JsonIgnoreProperties(value = { "assetLine" }, allowSetters = true)
     private ConsumableAssignment consumableAssignment;
 
+    /** Khi loss_kind = COMBINED: JSON mảng các dòng (thiết bị / vật tư). */
+    @Lob
+    @Column(name = "loss_entries_json")
+    private String lossEntriesJson;
+
     public Long getId() {
         return id;
     }
@@ -182,5 +187,13 @@ public class LossReportRequest implements Serializable {
 
     public void setConsumableAssignment(ConsumableAssignment consumableAssignment) {
         this.consumableAssignment = consumableAssignment;
+    }
+
+    public String getLossEntriesJson() {
+        return lossEntriesJson;
+    }
+
+    public void setLossEntriesJson(String lossEntriesJson) {
+        this.lossEntriesJson = lossEntriesJson;
     }
 }

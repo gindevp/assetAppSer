@@ -6,4 +6,6 @@ package com.gindevp.app.domain.enumeration;
 public enum LossReportKind {
     EQUIPMENT,
     CONSUMABLE,
+    /** Một phiếu gồm nhiều dòng thiết bị / vật tư (JSON trong loss_entries_json). */
+    COMBINED,
 }

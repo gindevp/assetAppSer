@@ -10,6 +10,7 @@ import com.gindevp.app.security.AuthoritiesConstants;
 import com.gindevp.app.security.SecurityUtils;
 import com.gindevp.app.service.dto.AdminUserDTO;
 import com.gindevp.app.service.dto.UserDTO;
+import com.gindevp.app.web.rest.errors.BadRequestAlertException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -182,12 +183,41 @@ public class UserService {
         return user;
     }
 
-    private void applyEmployeeLink(User user, Long employeeId) {
-        if (employeeId == null) {
-            user.setEmployee(null);
-        } else {
-            employeeRepository.findById(employeeId).ifPresentOrElse(user::setEmployee, () -> user.setEmployee(null));
+    private void applyEmployeeLink(User user, Long newEmployeeId) {
+        Long userId = user.getId();
+        Long currentId = user.getEmployee() != null ? user.getEmployee().getId() : null;
+
+        if (currentId != null) {
+            if (newEmployeeId == null || !Objects.equals(currentId, newEmployeeId)) {
+                throw new BadRequestAlertException(
+                    "Tài khoản đã gán nhân viên — không được đổi hoặc gỡ liên kết.",
+                    "user",
+                    "employeelinklocked"
+                );
+            }
+            return;
         }
+
+        if (newEmployeeId == null) {
+            user.setEmployee(null);
+            return;
+        }
+
+        userRepository
+            .findOneByEmployee_Id(newEmployeeId)
+            .filter(other -> userId == null || !Objects.equals(other.getId(), userId))
+            .ifPresent(other -> {
+                throw new BadRequestAlertException(
+                    "Nhân viên này đã gán cho tài khoản khác (mỗi nhân viên chỉ một tài khoản).",
+                    "user",
+                    "employeealreadylinked"
+                );
+            });
+
+        var employee = employeeRepository
+            .findById(newEmployeeId)
+            .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy nhân viên.", "user", "employeenotfound"));
+        user.setEmployee(employee);
     }
 
     /**

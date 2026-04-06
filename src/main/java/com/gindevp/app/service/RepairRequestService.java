@@ -1,5 +1,7 @@
 package com.gindevp.app.service;
 
+import com.gindevp.app.domain.ConsumableAssignment;
+import com.gindevp.app.domain.Employee;
 import com.gindevp.app.domain.Equipment;
 import com.gindevp.app.domain.RepairRequest;
 import com.gindevp.app.domain.RepairRequestLine;
@@ -8,6 +10,9 @@ import com.gindevp.app.domain.enumeration.EquipmentOperationalStatus;
 import com.gindevp.app.domain.enumeration.RepairRequestStatus;
 import com.gindevp.app.domain.enumeration.RepairResolution;
 import com.gindevp.app.repository.AssetItemRepository;
+import com.gindevp.app.repository.ConsumableAssignmentRepository;
+import com.gindevp.app.repository.ConsumableStockRepository;
+import com.gindevp.app.repository.EmployeeRepository;
 import com.gindevp.app.repository.EquipmentAssignmentRepository;
 import com.gindevp.app.repository.EquipmentRepository;
 import com.gindevp.app.repository.RepairRequestRepository;
@@ -54,6 +59,12 @@ public class RepairRequestService {
 
     private final EquipmentAssignmentRepository equipmentAssignmentRepository;
 
+    private final ConsumableAssignmentRepository consumableAssignmentRepository;
+
+    private final ConsumableStockRepository consumableStockRepository;
+
+    private final EmployeeRepository employeeRepository;
+
     private final CurrentEmployeeService currentEmployeeService;
 
     private final AppAuditLogService appAuditLogService;
@@ -67,6 +78,9 @@ public class RepairRequestService {
         EquipmentRepository equipmentRepository,
         AssetItemRepository assetItemRepository,
         EquipmentAssignmentRepository equipmentAssignmentRepository,
+        ConsumableAssignmentRepository consumableAssignmentRepository,
+        ConsumableStockRepository consumableStockRepository,
+        EmployeeRepository employeeRepository,
         CurrentEmployeeService currentEmployeeService,
         AppAuditLogService appAuditLogService,
         EquipmentRepairReturnEligibilityService equipmentRepairReturnEligibilityService
@@ -77,6 +91,9 @@ public class RepairRequestService {
         this.equipmentRepository = equipmentRepository;
         this.assetItemRepository = assetItemRepository;
         this.equipmentAssignmentRepository = equipmentAssignmentRepository;
+        this.consumableAssignmentRepository = consumableAssignmentRepository;
+        this.consumableStockRepository = consumableStockRepository;
+        this.employeeRepository = employeeRepository;
         this.currentEmployeeService = currentEmployeeService;
         this.appAuditLogService = appAuditLogService;
         this.equipmentRepairReturnEligibilityService = equipmentRepairReturnEligibilityService;
@@ -234,12 +251,8 @@ public class RepairRequestService {
     }
 
     private void applyRepairCompleted(RepairRequest saved) {
-        List<Long> ids = equipmentIdsForRequest(saved);
-        if (ids.isEmpty()) {
-            return;
-        }
         RepairResolution out = saved.getRepairOutcome() != null ? saved.getRepairOutcome() : RepairResolution.RETURN_USER;
-        for (Long eqId : ids) {
+        for (Long eqId : equipmentIdsForRequest(saved)) {
             Equipment eq = equipmentRepository.findById(eqId).orElse(null);
             if (eq == null) {
                 continue;
@@ -262,6 +275,124 @@ public class RepairRequestService {
             );
             LOG.debug("Repair completed for equipment {} outcome {}", eqId, out);
         }
+        applyConsumableRepairCompletion(saved, out);
+    }
+
+    /**
+     * Kết quả «Trả về kho» / «Hỏng»: trừ SL bàn giao vật tư (FIFO) và cập nhật tồn — giống hoàn thành thu hồi.
+     * «Trả lại người dùng»: không đụng bàn giao vật tư.
+     */
+    private void applyConsumableRepairCompletion(RepairRequest saved, RepairResolution out) {
+        if (out == RepairResolution.RETURN_USER) {
+            return;
+        }
+        Employee requester = saved.getRequester();
+        Long requesterId = requester != null ? requester.getId() : null;
+        if (requesterId == null) {
+            return;
+        }
+        if (saved.getLines() == null || saved.getLines().isEmpty()) {
+            return;
+        }
+        for (RepairRequestLine line : saved.getLines()) {
+            if (line.getLineType() != AssetManagementType.CONSUMABLE || line.getAssetItem() == null) {
+                continue;
+            }
+            Long itemId = line.getAssetItem().getId();
+            if (itemId == null) {
+                continue;
+            }
+            int qty = line.getQuantity() != null ? line.getQuantity() : 0;
+            if (qty <= 0) {
+                continue;
+            }
+            int actuallyReturned = drainConsumableReturnedQuantity(requesterId, itemId, qty);
+            consumableStockRepository.findFirstByAssetItem_Id(itemId).ifPresent(stock -> {
+                int onHand = stock.getQuantityOnHand() != null ? stock.getQuantityOnHand() : 0;
+                int issued = stock.getQuantityIssued() != null ? stock.getQuantityIssued() : 0;
+                stock.setQuantityIssued(Math.max(0, issued - actuallyReturned));
+                if (out == RepairResolution.RETURN_STOCK) {
+                    stock.setQuantityOnHand(onHand + actuallyReturned);
+                }
+                consumableStockRepository.save(stock);
+            });
+            appAuditLogService.recordBusiness(
+                "REPAIR_CONSUMABLE_COMPLETED",
+                "requestId="
+                    + saved.getId()
+                    + " assetItemId="
+                    + itemId
+                    + " qty="
+                    + qty
+                    + " drained="
+                    + actuallyReturned
+                    + " outcome="
+                    + out
+            );
+            LOG.debug("Repair consumable line completed assetItemId={} drained={} outcome={}", itemId, actuallyReturned, out);
+        }
+    }
+
+    /** Cùng logic {@link ReturnRequestService} — trả vật tư từ bàn giao NV → PB → vị trí → pool. */
+    private int drainConsumableReturnedQuantity(Long requesterId, Long assetItemId, int qtyToReturn) {
+        if (qtyToReturn <= 0) {
+            return 0;
+        }
+        int remaining = qtyToReturn;
+        int totalDrained = 0;
+        Optional<Employee> requesterEmp = employeeRepository.findOneWithToOneRelationships(requesterId);
+        Long deptId = requesterEmp.map(e -> e.getDepartment() != null ? e.getDepartment().getId() : null).orElse(null);
+        Long locId = requesterEmp.map(e -> e.getLocation() != null ? e.getLocation().getId() : null).orElse(null);
+
+        totalDrained += drainConsumableFromList(
+            consumableAssignmentRepository.findByEmployee_IdAndAssetItem_IdOrderByIdAsc(requesterId, assetItemId),
+            remaining
+        );
+        remaining = qtyToReturn - totalDrained;
+        if (remaining > 0 && deptId != null) {
+            int d = drainConsumableFromList(
+                consumableAssignmentRepository.findByDepartment_IdAndAssetItem_IdAndEmployeeIsNullOrderByIdAsc(deptId, assetItemId),
+                remaining
+            );
+            totalDrained += d;
+            remaining = qtyToReturn - totalDrained;
+        }
+        if (remaining > 0 && locId != null) {
+            int d = drainConsumableFromList(
+                consumableAssignmentRepository.findByLocation_IdAndAssetItem_IdAndEmployeeIsNullAndDepartmentIsNullOrderByIdAsc(locId, assetItemId),
+                remaining
+            );
+            totalDrained += d;
+            remaining = qtyToReturn - totalDrained;
+        }
+        if (remaining > 0) {
+            totalDrained += drainConsumableFromList(
+                consumableAssignmentRepository.findByAssetItem_IdAndEmployeeIsNullAndDepartmentIsNullAndLocationIsNullOrderByIdAsc(assetItemId),
+                remaining
+            );
+        }
+        return totalDrained;
+    }
+
+    private int drainConsumableFromList(List<ConsumableAssignment> assignments, int maxQty) {
+        int remaining = maxQty;
+        int taken = 0;
+        for (ConsumableAssignment ca : assignments) {
+            if (remaining <= 0) {
+                break;
+            }
+            int already = ca.getReturnedQuantity() != null ? ca.getReturnedQuantity() : 0;
+            int canReturn = ca.getQuantity() - already;
+            if (canReturn <= 0) {
+                continue;
+            }
+            int portion = Math.min(canReturn, remaining);
+            ca.setReturnedQuantity(already + portion);
+            consumableAssignmentRepository.save(ca);
+            taken += portion;
+            remaining -= portion;
+        }
+        return taken;
     }
 
     private static List<Long> equipmentIdsForRequest(RepairRequest r) {

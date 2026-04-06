@@ -12,9 +12,15 @@ import com.gindevp.app.service.mapper.AssetItemMapper;
 import com.gindevp.app.service.mapper.EmployeeMapper;
 import com.gindevp.app.service.mapper.EquipmentMapper;
 import com.gindevp.app.web.rest.errors.BadRequestAlertException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -53,6 +59,8 @@ public class LossReportRequestService {
 
     private final AssetItemMapper assetItemMapper;
 
+    private final ObjectMapper objectMapper;
+
     public LossReportRequestService(
         LossReportRequestRepository lossReportRequestRepository,
         EmployeeRepository employeeRepository,
@@ -64,7 +72,8 @@ public class LossReportRequestService {
         AppAuditLogService appAuditLogService,
         EmployeeMapper employeeMapper,
         EquipmentMapper equipmentMapper,
-        AssetItemMapper assetItemMapper
+        AssetItemMapper assetItemMapper,
+        ObjectMapper objectMapper
     ) {
         this.lossReportRequestRepository = lossReportRequestRepository;
         this.employeeRepository = employeeRepository;
@@ -77,6 +86,7 @@ public class LossReportRequestService {
         this.employeeMapper = employeeMapper;
         this.equipmentMapper = equipmentMapper;
         this.assetItemMapper = assetItemMapper;
+        this.objectMapper = objectMapper;
     }
 
     /** Chỉ cổng NV (không phải QLTS/Admin/GĐ) tạo YC. */
@@ -158,6 +168,129 @@ public class LossReportRequestService {
         return t.isEmpty() ? null : t;
     }
 
+    private void validateEquipmentLineForLoss(Long eqId, Employee requester) {
+        Equipment eq = equipmentRepository.findById(eqId).orElseThrow(() -> new BadRequestAlertException("Không tìm thấy thiết bị", ENTITY_NAME, "noequipment"));
+        if (eq.getStatus() != EquipmentOperationalStatus.IN_USE) {
+            throw new BadRequestAlertException("Chỉ báo mất thiết bị đang sử dụng", ENTITY_NAME, "badequipmentstatus");
+        }
+        EquipmentAssignment assign = equipmentAssignmentRepository
+            .findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(eqId)
+            .orElseThrow(() -> new BadRequestAlertException("Thiết bị không có bàn giao hiệu lực", ENTITY_NAME, "noassignment"));
+        if (!assignmentMatchesRequester(assign, requester)) {
+            throw new AccessDeniedException("Thiết bị không thuộc phạm vi «Tài sản của tôi»");
+        }
+    }
+
+    private void validateConsumableLineForLoss(Long caId, int qty, Employee requester) {
+        ConsumableAssignment ca = consumableAssignmentRepository
+            .findById(caId)
+            .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca"));
+        if (!consumableAssignmentMatchesRequester(ca, requester)) {
+            throw new AccessDeniedException("Vật tư không thuộc phạm vi «Tài sản của tôi»");
+        }
+        int held = consumableHeld(ca);
+        if (qty > held || qty < 1) {
+            throw new BadRequestAlertException("Số lượng vượt SL còn giữ (" + held + ")", ENTITY_NAME, "qtyexceed");
+        }
+    }
+
+    private boolean equipmentInOtherCombinedPending(Long equipmentId) {
+        return lossReportRequestRepository
+            .findByStatusAndLossKind(LossReportRequestStatus.PENDING, LossReportKind.COMBINED)
+            .stream()
+            .anyMatch(r -> jsonLinesContainEquipment(r.getLossEntriesJson(), equipmentId));
+    }
+
+    private boolean consumableAssignmentInOtherCombinedPending(Long caId) {
+        return lossReportRequestRepository
+            .findByStatusAndLossKind(LossReportRequestStatus.PENDING, LossReportKind.COMBINED)
+            .stream()
+            .anyMatch(r -> jsonLinesContainConsumableAssignment(r.getLossEntriesJson(), caId));
+    }
+
+    private boolean jsonLinesContainEquipment(String json, Long equipmentId) {
+        if (json == null || equipmentId == null) {
+            return false;
+        }
+        try {
+            List<LossReportEntryLineDTO> lines = objectMapper.readValue(json, new TypeReference<List<LossReportEntryLineDTO>>() {});
+            return lines.stream()
+                .anyMatch(l -> "EQUIPMENT".equalsIgnoreCase(l.getLineType()) && equipmentId.equals(l.getEquipmentId()));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean jsonLinesContainConsumableAssignment(String json, Long caId) {
+        if (json == null || caId == null) {
+            return false;
+        }
+        try {
+            List<LossReportEntryLineDTO> lines = objectMapper.readValue(json, new TypeReference<List<LossReportEntryLineDTO>>() {});
+            return lines.stream()
+                .anyMatch(l -> "CONSUMABLE".equalsIgnoreCase(l.getLineType()) && caId.equals(l.getConsumableAssignmentId()));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void populateCombinedLoss(LossReportRequest e, LossReportRequestDTO dto, Employee requester) {
+        List<LossReportEntryLineDTO> lines = dto.getLossEntries();
+        if (lines == null || lines.isEmpty()) {
+            throw new BadRequestAlertException("Chọn ít nhất một tài sản báo mất", ENTITY_NAME, "nolines");
+        }
+        Set<Long> seenEq = new HashSet<>();
+        Set<Long> seenCa = new HashSet<>();
+        for (LossReportEntryLineDTO line : lines) {
+            String lt = line.getLineType();
+            if (lt == null) {
+                throw new BadRequestAlertException("Thiếu loại dòng", ENTITY_NAME, "badline");
+            }
+            if ("EQUIPMENT".equalsIgnoreCase(lt)) {
+                Long eqId = line.getEquipmentId();
+                if (eqId == null) {
+                    throw new BadRequestAlertException("Thiếu thiết bị trên dòng", ENTITY_NAME, "badline");
+                }
+                if (!seenEq.add(eqId)) {
+                    throw new BadRequestAlertException("Trùng thiết bị trong cùng phiếu", ENTITY_NAME, "dupline");
+                }
+                validateEquipmentLineForLoss(eqId, requester);
+                if (lossReportRequestRepository.existsByEquipment_IdAndStatus(eqId, LossReportRequestStatus.PENDING)) {
+                    throw new BadRequestAlertException("Đã có YC báo mất chờ duyệt cho thiết bị này", ENTITY_NAME, "duplicatepending");
+                }
+                if (equipmentInOtherCombinedPending(eqId)) {
+                    throw new BadRequestAlertException("Thiết bị đã nằm trong phiếu báo mất gộp chờ duyệt", ENTITY_NAME, "duplicatepending");
+                }
+            } else if ("CONSUMABLE".equalsIgnoreCase(lt)) {
+                Long caId = line.getConsumableAssignmentId();
+                Integer q = line.getQuantity();
+                if (caId == null || q == null || q < 1) {
+                    throw new BadRequestAlertException("Dòng vật tư: cần bàn giao và số lượng ≥ 1", ENTITY_NAME, "badline");
+                }
+                if (!seenCa.add(caId)) {
+                    throw new BadRequestAlertException("Trùng dòng bàn giao vật tư trong cùng phiếu", ENTITY_NAME, "dupline");
+                }
+                validateConsumableLineForLoss(caId, q, requester);
+                if (lossReportRequestRepository.existsByConsumableAssignment_IdAndStatus(caId, LossReportRequestStatus.PENDING)) {
+                    throw new BadRequestAlertException("Đã có YC báo mất chờ duyệt cho dòng vật tư này", ENTITY_NAME, "duplicatepending");
+                }
+                if (consumableAssignmentInOtherCombinedPending(caId)) {
+                    throw new BadRequestAlertException("Dòng vật tư đã nằm trong phiếu báo mất gộp chờ duyệt", ENTITY_NAME, "duplicatepending");
+                }
+            } else {
+                throw new BadRequestAlertException("Loại dòng không hợp lệ (EQUIPMENT / CONSUMABLE)", ENTITY_NAME, "badline");
+            }
+        }
+        try {
+            e.setLossEntriesJson(objectMapper.writeValueAsString(lines));
+        } catch (JsonProcessingException ex) {
+            throw new BadRequestAlertException("Không lưu được dữ liệu dòng", ENTITY_NAME, "badjson");
+        }
+        e.setEquipment(null);
+        e.setConsumableAssignment(null);
+        e.setQuantity(null);
+    }
+
     public LossReportRequestDTO save(LossReportRequestDTO dto) {
         assertEmployeePortalCanCreate();
         Long eid = currentEmployeeService
@@ -201,7 +334,9 @@ public class LossReportRequestService {
         e.setLossDescription(lossDescription);
         e.setRequester(requester);
 
-        if (dto.getLossKind() == LossReportKind.EQUIPMENT) {
+        if (dto.getLossKind() == LossReportKind.COMBINED) {
+            populateCombinedLoss(e, dto, requester);
+        } else if (dto.getLossKind() == LossReportKind.EQUIPMENT) {
             if (dto.getEquipment() == null || dto.getEquipment().getId() == null) {
                 throw new BadRequestAlertException("Chọn thiết bị", ENTITY_NAME, "noequipment");
             }
@@ -221,7 +356,7 @@ public class LossReportRequestService {
             }
             e.setEquipment(eq);
             e.setQuantity(1);
-        } else {
+        } else if (dto.getLossKind() == LossReportKind.CONSUMABLE) {
             if (dto.getConsumableAssignment() == null || dto.getConsumableAssignment().getId() == null) {
                 throw new BadRequestAlertException("Chọn dòng vật tư (bàn giao)", ENTITY_NAME, "noca");
             }
@@ -244,6 +379,8 @@ public class LossReportRequestService {
             }
             e.setConsumableAssignment(ca);
             e.setQuantity(dto.getQuantity());
+        } else {
+            throw new BadRequestAlertException("Loại báo mất không hợp lệ", ENTITY_NAME, "badkind");
         }
 
         e = lossReportRequestRepository.save(e);
@@ -255,9 +392,17 @@ public class LossReportRequestService {
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
             throw new AccessDeniedException("Chỉ QLTS/Admin/GĐ xác nhận hoặc từ chối YC báo mất");
         }
-        if (dto.getId() == null || dto.getStatus() == null) {
-            throw new BadRequestAlertException("Cần id và trạng thái", ENTITY_NAME, "badpatch");
+        if (dto.getId() == null) {
+            throw new BadRequestAlertException("Cần id", ENTITY_NAME, "badpatch");
         }
+        LossReportRequestStatus st = dto.getStatus();
+        if (st == LossReportRequestStatus.APPROVED || st == LossReportRequestStatus.REJECTED) {
+            return approveOrRejectLossRequest(dto);
+        }
+        return adminUpdatePendingFields(dto);
+    }
+
+    private Optional<LossReportRequestDTO> approveOrRejectLossRequest(LossReportRequestDTO dto) {
         return lossReportRequestRepository
             .findById(dto.getId())
             .map(existing -> {
@@ -282,37 +427,140 @@ public class LossReportRequestService {
             });
     }
 
-    private void applyApprovedLoss(LossReportRequest lr) {
-        if (lr.getLossKind() == LossReportKind.EQUIPMENT && lr.getEquipment() != null) {
-            Long eqId = lr.getEquipment().getId();
-            Equipment eq = equipmentRepository.findById(eqId).orElseThrow();
-            eq.setStatus(EquipmentOperationalStatus.LOST);
-            equipmentRepository.save(eq);
-            equipmentAssignmentRepository
-                .findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(eqId)
-                .ifPresent(a -> {
-                    a.setReturnedDate(LocalDate.now());
-                    equipmentAssignmentRepository.save(a);
-                });
-        } else if (lr.getLossKind() == LossReportKind.CONSUMABLE && lr.getConsumableAssignment() != null && lr.getQuantity() != null) {
-            ConsumableAssignment ca = consumableAssignmentRepository
-                .findById(lr.getConsumableAssignment().getId())
-                .orElseThrow();
-            int qty = lr.getQuantity();
-            int already = ca.getReturnedQuantity() != null ? ca.getReturnedQuantity() : 0;
-            int can = ca.getQuantity() - already;
-            if (qty > can || qty < 1) {
-                throw new BadRequestAlertException("Số lượng báo mất không hợp lệ khi áp dụng", ENTITY_NAME, "badapplyqty");
-            }
-            ca.setReturnedQuantity(already + qty);
-            consumableAssignmentRepository.save(ca);
-            Long itemId = ca.getAssetItem().getId();
-            consumableStockRepository.findFirstByAssetItem_Id(itemId).ifPresent(stock -> {
-                int issued = stock.getQuantityIssued() != null ? stock.getQuantityIssued() : 0;
-                stock.setQuantityIssued(Math.max(0, issued - qty));
-                consumableStockRepository.save(stock);
+    /**
+     * QLTS/Admin chỉnh nội dung YC đang chờ duyệt (PATCH không gửi APPROVED/REJECTED).
+     */
+    private Optional<LossReportRequestDTO> adminUpdatePendingFields(LossReportRequestDTO dto) {
+        return lossReportRequestRepository
+            .findById(dto.getId())
+            .map(existing -> {
+                if (existing.getStatus() != LossReportRequestStatus.PENDING) {
+                    throw new BadRequestAlertException("Chỉ sửa khi đang chờ duyệt", ENTITY_NAME, "notpending");
+                }
+                if (dto.getLossOccurredAt() != null) {
+                    String t = trimToNull(dto.getLossOccurredAt());
+                    if (t == null) {
+                        throw new BadRequestAlertException("Thời gian không được để trống", ENTITY_NAME, "nolosstime");
+                    }
+                    existing.setLossOccurredAt(t);
+                }
+                if (dto.getLossLocation() != null) {
+                    String t = trimToNull(dto.getLossLocation());
+                    if (t == null) {
+                        throw new BadRequestAlertException("Địa điểm không được để trống", ENTITY_NAME, "nolossplace");
+                    }
+                    existing.setLossLocation(t);
+                }
+                if (dto.getReason() != null) {
+                    String t = trimToNull(dto.getReason());
+                    if (t == null) {
+                        throw new BadRequestAlertException("Lý do không được để trống", ENTITY_NAME, "noreason");
+                    }
+                    existing.setReason(t);
+                }
+                if (dto.getLossDescription() != null) {
+                    String t = trimToNull(dto.getLossDescription());
+                    if (t == null) {
+                        throw new BadRequestAlertException("Mô tả mất không được để trống", ENTITY_NAME, "nolossdesc");
+                    }
+                    existing.setLossDescription(t);
+                }
+                if (dto.getQuantity() != null && existing.getLossKind() == LossReportKind.CONSUMABLE) {
+                    int q = dto.getQuantity();
+                    if (q < 1) {
+                        throw new BadRequestAlertException("Số lượng ≥ 1", ENTITY_NAME, "badqty");
+                    }
+                    if (existing.getConsumableAssignment() == null || existing.getConsumableAssignment().getId() == null) {
+                        throw new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca");
+                    }
+                    ConsumableAssignment ca = consumableAssignmentRepository
+                        .findById(existing.getConsumableAssignment().getId())
+                        .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca"));
+                    int held = consumableHeld(ca);
+                    if (q > held) {
+                        throw new BadRequestAlertException("Số lượng vượt SL còn giữ (" + held + ")", ENTITY_NAME, "qtyexceed");
+                    }
+                    existing.setQuantity(q);
+                }
+                LossReportRequest saved = lossReportRequestRepository.save(existing);
+                String code = saved.getCode() != null ? saved.getCode() : String.valueOf(saved.getId());
+                appAuditLogService.recordBusiness("LOSS_REPORT_ADMIN_EDIT", "requestId=" + saved.getId() + " code=" + code);
+                return toDto(lossReportRequestRepository.findOneWithRelationships(saved.getId()).orElse(saved));
             });
+    }
+
+    public void delete(Long id) {
+        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+            throw new AccessDeniedException("Chỉ QLTS/Admin/GĐ xóa YC báo mất");
         }
+        LossReportRequest e = lossReportRequestRepository
+            .findById(id)
+            .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy YC báo mất", ENTITY_NAME, "idnotfound"));
+        if (e.getStatus() != LossReportRequestStatus.PENDING) {
+            throw new BadRequestAlertException("Chỉ xóa khi đang chờ duyệt", ENTITY_NAME, "notpending");
+        }
+        lossReportRequestRepository.delete(e);
+        String code = e.getCode() != null ? e.getCode() : String.valueOf(id);
+        appAuditLogService.recordBusiness("LOSS_REPORT_DELETED", "requestId=" + id + " code=" + code);
+    }
+
+    private void applyApprovedLoss(LossReportRequest lr) {
+        if (lr.getLossKind() == LossReportKind.COMBINED && lr.getLossEntriesJson() != null) {
+            try {
+                List<LossReportEntryLineDTO> lines = objectMapper.readValue(
+                    lr.getLossEntriesJson(),
+                    new TypeReference<List<LossReportEntryLineDTO>>() {}
+                );
+                for (LossReportEntryLineDTO line : lines) {
+                    if ("EQUIPMENT".equalsIgnoreCase(line.getLineType()) && line.getEquipmentId() != null) {
+                        applyApprovedEquipmentLoss(line.getEquipmentId());
+                    } else if ("CONSUMABLE".equalsIgnoreCase(line.getLineType())) {
+                        applyApprovedConsumableLoss(line.getConsumableAssignmentId(), line.getQuantity());
+                    }
+                }
+            } catch (Exception ex) {
+                throw new BadRequestAlertException("Không áp dụng được phiếu gộp — dữ liệu dòng lỗi", ENTITY_NAME, "badapplyjson");
+            }
+            return;
+        }
+        if (lr.getLossKind() == LossReportKind.EQUIPMENT && lr.getEquipment() != null) {
+            applyApprovedEquipmentLoss(lr.getEquipment().getId());
+        } else if (lr.getLossKind() == LossReportKind.CONSUMABLE && lr.getConsumableAssignment() != null && lr.getQuantity() != null) {
+            applyApprovedConsumableLoss(lr.getConsumableAssignment().getId(), lr.getQuantity());
+        }
+    }
+
+    private void applyApprovedEquipmentLoss(Long eqId) {
+        Equipment eq = equipmentRepository.findById(eqId).orElseThrow();
+        eq.setStatus(EquipmentOperationalStatus.LOST);
+        equipmentRepository.save(eq);
+        equipmentAssignmentRepository
+            .findFirstByEquipment_IdAndReturnedDateIsNullOrderByIdDesc(eqId)
+            .ifPresent(a -> {
+                a.setReturnedDate(LocalDate.now());
+                equipmentAssignmentRepository.save(a);
+            });
+    }
+
+    private void applyApprovedConsumableLoss(Long consumableAssignmentId, Integer quantity) {
+        if (consumableAssignmentId == null || quantity == null || quantity < 1) {
+            throw new BadRequestAlertException("Dòng vật tư không hợp lệ khi áp dụng", ENTITY_NAME, "badapplyqty");
+        }
+        ConsumableAssignment ca = consumableAssignmentRepository.findById(consumableAssignmentId).orElseThrow();
+        int qty = quantity;
+        int already = ca.getReturnedQuantity() != null ? ca.getReturnedQuantity() : 0;
+        int can = ca.getQuantity() - already;
+        if (qty > can || qty < 1) {
+            throw new BadRequestAlertException("Số lượng báo mất không hợp lệ khi áp dụng", ENTITY_NAME, "badapplyqty");
+        }
+        ca.setReturnedQuantity(already + qty);
+        consumableAssignmentRepository.save(ca);
+        Long itemId = ca.getAssetItem().getId();
+        consumableStockRepository.findFirstByAssetItem_Id(itemId).ifPresent(stock -> {
+            int issued = stock.getQuantityIssued() != null ? stock.getQuantityIssued() : 0;
+            stock.setQuantityIssued(Math.max(0, issued - qty));
+            consumableStockRepository.save(stock);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -370,6 +618,28 @@ public class LossReportRequestService {
                 ref.setAssetItem(assetItemMapper.toDto(e.getConsumableAssignment().getAssetItem()));
             }
             d.setConsumableAssignment(ref);
+        }
+        if (e.getLossKind() == LossReportKind.COMBINED && e.getLossEntriesJson() != null) {
+            try {
+                List<LossReportEntryLineDTO> lines = objectMapper.readValue(
+                    e.getLossEntriesJson(),
+                    new TypeReference<List<LossReportEntryLineDTO>>() {}
+                );
+                for (LossReportEntryLineDTO line : lines) {
+                    if ("CONSUMABLE".equalsIgnoreCase(line.getLineType()) && line.getConsumableAssignmentId() != null) {
+                        consumableAssignmentRepository
+                            .findById(line.getConsumableAssignmentId())
+                            .ifPresent(ca -> {
+                                if (ca.getAssetItem() != null) {
+                                    line.setAssetItemId(ca.getAssetItem().getId());
+                                }
+                            });
+                    }
+                }
+                d.setLossEntries(lines);
+            } catch (Exception ignored) {
+                // bỏ qua parse lỗi — list để trống
+            }
         }
         return d;
     }

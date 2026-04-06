@@ -36,5 +36,6 @@ public interface ReturnRequestLineMapper extends EntityMapper<ReturnRequestLineD
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "equipmentCode", source = "equipmentCode")
+    @Mapping(target = "serial", source = "serial")
     EquipmentDTO toDtoEquipmentEquipmentCode(Equipment equipment);
 }
