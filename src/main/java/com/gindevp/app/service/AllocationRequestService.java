@@ -740,18 +740,7 @@ public class AllocationRequestService {
                 deductConsumableStockForLine(itemId, qty, line.getAssetItem());
 
                 Optional<ConsumableAssignment> existingOpt = findExistingConsumableAssignmentForTarget(targets, itemId);
-                if (existingOpt.isPresent()) {
-                    ConsumableAssignment ca = existingOpt.get();
-                    int prev = ca.getQuantity() != null ? ca.getQuantity() : 0;
-                    ca.setQuantity(prev + qty);
-                    String oldNote = ca.getNote();
-                    if (oldNote != null && !oldNote.isBlank()) {
-                        ca.setNote(oldNote + "; " + noteSuffix);
-                    } else {
-                        ca.setNote(noteSuffix);
-                    }
-                    consumableAssignmentRepository.save(ca);
-                } else {
+                if (existingOpt.isEmpty()) {
                     ConsumableAssignment ca = new ConsumableAssignment();
                     ca.setQuantity(qty);
                     ca.setAssignedDate(today);
@@ -761,6 +750,17 @@ public class AllocationRequestService {
                     ca.setDepartment(targets.department());
                     ca.setLocation(targets.location());
                     ca.setNote(noteSuffix);
+                    consumableAssignmentRepository.save(ca);
+                } else {
+                    ConsumableAssignment ca = existingOpt.orElseThrow();
+                    int prev = ca.getQuantity() != null ? ca.getQuantity() : 0;
+                    ca.setQuantity(prev + qty);
+                    String oldNote = ca.getNote();
+                    if (oldNote != null && !oldNote.isBlank()) {
+                        ca.setNote(oldNote + "; " + noteSuffix);
+                    } else {
+                        ca.setNote(noteSuffix);
+                    }
                     consumableAssignmentRepository.save(ca);
                 }
             }
