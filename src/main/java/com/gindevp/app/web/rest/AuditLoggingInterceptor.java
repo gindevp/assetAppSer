@@ -1,6 +1,7 @@
 package com.gindevp.app.web.rest;
 
 import com.gindevp.app.service.AppAuditLogService;
+import com.gindevp.app.service.RequestRealtimeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -10,9 +11,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class AuditLoggingInterceptor implements HandlerInterceptor {
 
     private final AppAuditLogService appAuditLogService;
+    private final RequestRealtimeService requestRealtimeService;
 
-    public AuditLoggingInterceptor(AppAuditLogService appAuditLogService) {
+    public AuditLoggingInterceptor(AppAuditLogService appAuditLogService, RequestRealtimeService requestRealtimeService) {
         this.appAuditLogService = appAuditLogService;
+        this.requestRealtimeService = requestRealtimeService;
     }
 
     @Override
@@ -33,5 +36,6 @@ public class AuditLoggingInterceptor implements HandlerInterceptor {
             return;
         }
         appAuditLogService.record(method, uri, status);
+        requestRealtimeService.publishHttpMutation(method, uri, status);
     }
 }

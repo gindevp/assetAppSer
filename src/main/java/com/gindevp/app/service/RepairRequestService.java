@@ -559,9 +559,6 @@ public class RepairRequestService {
 
     public void delete(Long id) {
         LOG.debug("Request to delete RepairRequest : {}", id);
-        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
-            throw new AccessDeniedException("Chỉ QLTS/Admin được xóa yêu cầu sửa chữa");
-        }
         RepairRequest r = repairRequestRepository
             .findById(id)
             .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy yêu cầu sửa chữa", ENTITY_NAME, "notfound"));
@@ -572,6 +569,19 @@ public class RepairRequestService {
                 ENTITY_NAME,
                 "baddeletestatus"
             );
+        }
+
+        if (currentEmployeeService.isAssetManagerOrAdmin()) {
+            repairRequestRepository.deleteById(id);
+            return;
+        }
+
+        Long eid = currentEmployeeService.currentEmployeeId().orElse(null);
+        if (eid == null || r.getRequester() == null || !Objects.equals(r.getRequester().getId(), eid)) {
+            throw new AccessDeniedException("Chỉ QLTS/Admin hoặc người gửi phiếu được xóa yêu cầu sửa chữa");
+        }
+        if (s != RepairRequestStatus.NEW) {
+            throw new AccessDeniedException("Người gửi chỉ được hủy (xóa) phiếu ở trạng thái Mới tạo");
         }
         repairRequestRepository.deleteById(id);
     }

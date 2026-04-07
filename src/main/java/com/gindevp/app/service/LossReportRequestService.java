@@ -389,17 +389,20 @@ public class LossReportRequestService {
     }
 
     public Optional<LossReportRequestDTO> partialUpdate(LossReportRequestDTO dto) {
-        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
-            throw new AccessDeniedException("Chỉ QLTS/Admin/GĐ xác nhận hoặc từ chối YC báo mất");
-        }
         if (dto.getId() == null) {
             throw new BadRequestAlertException("Cần id", ENTITY_NAME, "badpatch");
         }
         LossReportRequestStatus st = dto.getStatus();
         if (st == LossReportRequestStatus.APPROVED || st == LossReportRequestStatus.REJECTED) {
+            if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+                throw new AccessDeniedException("Chỉ QLTS/Admin/GĐ xác nhận hoặc từ chối YC báo mất");
+            }
             return approveOrRejectLossRequest(dto);
         }
-        return adminUpdatePendingFields(dto);
+        if (currentEmployeeService.isAssetManagerOrAdmin()) {
+            return adminUpdatePendingFields(dto);
+        }
+        return requesterUpdatePendingFields(dto);
     }
 
     private Optional<LossReportRequestDTO> approveOrRejectLossRequest(LossReportRequestDTO dto) {
@@ -434,54 +437,7 @@ public class LossReportRequestService {
         return lossReportRequestRepository
             .findById(dto.getId())
             .map(existing -> {
-                if (existing.getStatus() != LossReportRequestStatus.PENDING) {
-                    throw new BadRequestAlertException("Chỉ sửa khi đang chờ duyệt", ENTITY_NAME, "notpending");
-                }
-                if (dto.getLossOccurredAt() != null) {
-                    String t = trimToNull(dto.getLossOccurredAt());
-                    if (t == null) {
-                        throw new BadRequestAlertException("Thời gian không được để trống", ENTITY_NAME, "nolosstime");
-                    }
-                    existing.setLossOccurredAt(t);
-                }
-                if (dto.getLossLocation() != null) {
-                    String t = trimToNull(dto.getLossLocation());
-                    if (t == null) {
-                        throw new BadRequestAlertException("Địa điểm không được để trống", ENTITY_NAME, "nolossplace");
-                    }
-                    existing.setLossLocation(t);
-                }
-                if (dto.getReason() != null) {
-                    String t = trimToNull(dto.getReason());
-                    if (t == null) {
-                        throw new BadRequestAlertException("Lý do không được để trống", ENTITY_NAME, "noreason");
-                    }
-                    existing.setReason(t);
-                }
-                if (dto.getLossDescription() != null) {
-                    String t = trimToNull(dto.getLossDescription());
-                    if (t == null) {
-                        throw new BadRequestAlertException("Mô tả mất không được để trống", ENTITY_NAME, "nolossdesc");
-                    }
-                    existing.setLossDescription(t);
-                }
-                if (dto.getQuantity() != null && existing.getLossKind() == LossReportKind.CONSUMABLE) {
-                    int q = dto.getQuantity();
-                    if (q < 1) {
-                        throw new BadRequestAlertException("Số lượng ≥ 1", ENTITY_NAME, "badqty");
-                    }
-                    if (existing.getConsumableAssignment() == null || existing.getConsumableAssignment().getId() == null) {
-                        throw new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca");
-                    }
-                    ConsumableAssignment ca = consumableAssignmentRepository
-                        .findById(existing.getConsumableAssignment().getId())
-                        .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca"));
-                    int held = consumableHeld(ca);
-                    if (q > held) {
-                        throw new BadRequestAlertException("Số lượng vượt SL còn giữ (" + held + ")", ENTITY_NAME, "qtyexceed");
-                    }
-                    existing.setQuantity(q);
-                }
+                applyPendingContentFromDto(existing, dto);
                 LossReportRequest saved = lossReportRequestRepository.save(existing);
                 String code = saved.getCode() != null ? saved.getCode() : String.valueOf(saved.getId());
                 appAuditLogService.recordBusiness("LOSS_REPORT_ADMIN_EDIT", "requestId=" + saved.getId() + " code=" + code);
@@ -489,15 +445,100 @@ public class LossReportRequestService {
             });
     }
 
-    public void delete(Long id) {
-        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
-            throw new AccessDeniedException("Chỉ QLTS/Admin/GĐ xóa YC báo mất");
+    /**
+     * Người tạo (NV / ĐPM — cùng tài khoản requester) chỉnh nội dung khi phiếu còn chờ duyệt.
+     */
+    private Optional<LossReportRequestDTO> requesterUpdatePendingFields(LossReportRequestDTO dto) {
+        Long cid = currentEmployeeService
+            .currentEmployeeId()
+            .orElseThrow(() -> new AccessDeniedException("Chưa liên kết nhân viên — không sửa được YC báo mất"));
+        return lossReportRequestRepository
+            .findById(dto.getId())
+            .map(existing -> {
+                if (existing.getRequester() == null || existing.getRequester().getId() == null) {
+                    throw new BadRequestAlertException("Phiếu thiếu người báo", ENTITY_NAME, "norequester");
+                }
+                if (!existing.getRequester().getId().equals(cid)) {
+                    throw new AccessDeniedException("Chỉ sửa YC báo mất do chính mình tạo");
+                }
+                applyPendingContentFromDto(existing, dto);
+                LossReportRequest saved = lossReportRequestRepository.save(existing);
+                String code = saved.getCode() != null ? saved.getCode() : String.valueOf(saved.getId());
+                appAuditLogService.recordBusiness("LOSS_REPORT_REQUESTER_EDIT", "requestId=" + saved.getId() + " code=" + code);
+                return toDto(lossReportRequestRepository.findOneWithRelationships(saved.getId()).orElse(saved));
+            });
+    }
+
+    /** Áp dụng các trường nội dung (không đổi trạng thái) — phiếu phải đang PENDING. */
+    private void applyPendingContentFromDto(LossReportRequest existing, LossReportRequestDTO dto) {
+        if (existing.getStatus() != LossReportRequestStatus.PENDING) {
+            throw new BadRequestAlertException("Chỉ sửa khi đang chờ duyệt", ENTITY_NAME, "notpending");
         }
+        if (dto.getLossOccurredAt() != null) {
+            String t = trimToNull(dto.getLossOccurredAt());
+            if (t == null) {
+                throw new BadRequestAlertException("Thời gian không được để trống", ENTITY_NAME, "nolosstime");
+            }
+            existing.setLossOccurredAt(t);
+        }
+        if (dto.getLossLocation() != null) {
+            String t = trimToNull(dto.getLossLocation());
+            if (t == null) {
+                throw new BadRequestAlertException("Địa điểm không được để trống", ENTITY_NAME, "nolossplace");
+            }
+            existing.setLossLocation(t);
+        }
+        if (dto.getReason() != null) {
+            String t = trimToNull(dto.getReason());
+            if (t == null) {
+                throw new BadRequestAlertException("Lý do không được để trống", ENTITY_NAME, "noreason");
+            }
+            existing.setReason(t);
+        }
+        if (dto.getLossDescription() != null) {
+            String t = trimToNull(dto.getLossDescription());
+            if (t == null) {
+                throw new BadRequestAlertException("Mô tả mất không được để trống", ENTITY_NAME, "nolossdesc");
+            }
+            existing.setLossDescription(t);
+        }
+        if (dto.getQuantity() != null && existing.getLossKind() == LossReportKind.CONSUMABLE) {
+            int q = dto.getQuantity();
+            if (q < 1) {
+                throw new BadRequestAlertException("Số lượng ≥ 1", ENTITY_NAME, "badqty");
+            }
+            if (existing.getConsumableAssignment() == null || existing.getConsumableAssignment().getId() == null) {
+                throw new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca");
+            }
+            ConsumableAssignment ca = consumableAssignmentRepository
+                .findById(existing.getConsumableAssignment().getId())
+                .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy bàn giao vật tư", ENTITY_NAME, "noca"));
+            int held = consumableHeld(ca);
+            if (q > held) {
+                throw new BadRequestAlertException("Số lượng vượt SL còn giữ (" + held + ")", ENTITY_NAME, "qtyexceed");
+            }
+            existing.setQuantity(q);
+        }
+    }
+
+    public void delete(Long id) {
         LossReportRequest e = lossReportRequestRepository
             .findById(id)
             .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy YC báo mất", ENTITY_NAME, "idnotfound"));
         if (e.getStatus() != LossReportRequestStatus.PENDING) {
             throw new BadRequestAlertException("Chỉ xóa khi đang chờ duyệt", ENTITY_NAME, "notpending");
+        }
+        if (currentEmployeeService.isAssetManagerOrAdmin()) {
+            lossReportRequestRepository.delete(e);
+            String code = e.getCode() != null ? e.getCode() : String.valueOf(id);
+            appAuditLogService.recordBusiness("LOSS_REPORT_DELETED", "requestId=" + id + " code=" + code);
+            return;
+        }
+        Long cid = currentEmployeeService
+            .currentEmployeeId()
+            .orElseThrow(() -> new AccessDeniedException("Chưa liên kết nhân viên — không xóa được YC báo mất"));
+        if (e.getRequester() == null || e.getRequester().getId() == null || !e.getRequester().getId().equals(cid)) {
+            throw new AccessDeniedException("Chỉ xóa YC báo mất do chính mình tạo");
         }
         lossReportRequestRepository.delete(e);
         String code = e.getCode() != null ? e.getCode() : String.valueOf(id);
