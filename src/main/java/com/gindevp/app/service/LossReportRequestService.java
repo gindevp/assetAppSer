@@ -37,6 +37,15 @@ public class LossReportRequestService {
 
     private static final String ENTITY_NAME = "lossReportRequest";
 
+    private static String employeeDisplayName(Employee e) {
+        if (e == null) return "nhân viên";
+        String name = e.getFullName() != null ? e.getFullName().trim() : "";
+        if (!name.isBlank()) return name;
+        String code = e.getCode() != null ? e.getCode().trim() : "";
+        if (!code.isBlank()) return code;
+        return e.getId() != null ? ("#" + e.getId()) : "nhân viên";
+    }
+
     private final LossReportRequestRepository lossReportRequestRepository;
 
     private final EmployeeRepository employeeRepository;
@@ -60,6 +69,7 @@ public class LossReportRequestService {
     private final AssetItemMapper assetItemMapper;
 
     private final ObjectMapper objectMapper;
+    private final AppNotificationService appNotificationService;
 
     public LossReportRequestService(
         LossReportRequestRepository lossReportRequestRepository,
@@ -73,7 +83,8 @@ public class LossReportRequestService {
         EmployeeMapper employeeMapper,
         EquipmentMapper equipmentMapper,
         AssetItemMapper assetItemMapper,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        AppNotificationService appNotificationService
     ) {
         this.lossReportRequestRepository = lossReportRequestRepository;
         this.employeeRepository = employeeRepository;
@@ -87,6 +98,7 @@ public class LossReportRequestService {
         this.equipmentMapper = equipmentMapper;
         this.assetItemMapper = assetItemMapper;
         this.objectMapper = objectMapper;
+        this.appNotificationService = appNotificationService;
     }
 
     /** Chỉ cổng NV (không phải QLTS/Admin/GĐ) tạo YC. */
@@ -384,6 +396,16 @@ public class LossReportRequestService {
         }
 
         e = lossReportRequestRepository.save(e);
+        String code = e.getCode() != null ? e.getCode() : ("#" + e.getId());
+        appNotificationService.pushForAuthorities(
+            "Yêu cầu báo mất mới",
+            "Có yêu cầu báo mất mới từ " + employeeDisplayName(requester) + ": " + code + ".",
+            "warning",
+            "/admin/loss-report-requests",
+            AuthoritiesConstants.ASSET_MANAGER,
+            AuthoritiesConstants.ADMIN,
+            AuthoritiesConstants.GD
+        );
         LOG.debug("Created loss report request {}", e.getId());
         return toDto(e);
     }

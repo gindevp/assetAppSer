@@ -72,6 +72,7 @@ public class AllocationRequestService {
     private final AssetItemRepository assetItemRepository;
 
     private final AssetLineRepository assetLineRepository;
+    private final AppNotificationService appNotificationService;
 
     public AllocationRequestService(
         AllocationRequestRepository allocationRequestRepository,
@@ -90,7 +91,8 @@ public class AllocationRequestService {
         AppAuditLogService appAuditLogService,
         StockDocumentEventService stockDocumentEventService,
         AssetItemRepository assetItemRepository,
-        AssetLineRepository assetLineRepository
+        AssetLineRepository assetLineRepository,
+        AppNotificationService appNotificationService
     ) {
         this.allocationRequestRepository = allocationRequestRepository;
         this.allocationRequestMapper = allocationRequestMapper;
@@ -109,12 +111,22 @@ public class AllocationRequestService {
         this.stockDocumentEventService = stockDocumentEventService;
         this.assetItemRepository = assetItemRepository;
         this.assetLineRepository = assetLineRepository;
+        this.appNotificationService = appNotificationService;
     }
 
     private static final String ENTITY_NAME = "allocationRequest";
 
     private static String nvl(String s) {
         return s != null ? s : "";
+    }
+
+    private static String employeeDisplayName(Employee e) {
+        if (e == null) return "nhân viên";
+        String name = e.getFullName() != null ? e.getFullName().trim() : "";
+        if (!name.isBlank()) return name;
+        String code = e.getCode() != null ? e.getCode().trim() : "";
+        if (!code.isBlank()) return code;
+        return e.getId() != null ? ("#" + e.getId()) : "nhân viên";
     }
 
     /** Mã + tên mặt hàng (vật tư) để hiển thị trong thông báo lỗi. */
@@ -904,6 +916,20 @@ public class AllocationRequestService {
             assertBeneficiaryAllowedForCurrentUser(allocationRequest);
         }
         allocationRequest = allocationRequestRepository.save(allocationRequest);
+        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+            String code = allocationRequest.getCode() != null ? allocationRequest.getCode() : ("#" + allocationRequest.getId());
+            Long requesterId = allocationRequest.getRequester() != null ? allocationRequest.getRequester().getId() : null;
+            Employee requester = requesterId != null ? employeeRepository.findById(requesterId).orElse(null) : null;
+            appNotificationService.pushForAuthorities(
+                "Yêu cầu cấp phát mới",
+                "Có yêu cầu cấp phát mới từ " + employeeDisplayName(requester) + ": " + code + ".",
+                "info",
+                "/admin/allocation-requests",
+                AuthoritiesConstants.ASSET_MANAGER,
+                AuthoritiesConstants.ADMIN,
+                AuthoritiesConstants.GD
+            );
+        }
         validateDeviceLinesPickedIfApproving(allocationRequest);
         return allocationRequestMapper.toDto(allocationRequest);
     }
@@ -929,6 +955,7 @@ public class AllocationRequestService {
         validateDeviceLinesPickedIfApproving(allocationRequest);
         assertRejectionReasonWhenRejected(oldStatus, allocationRequest.getStatus(), allocationRequest.getRejectionReason());
         final AllocationRequest savedAr = allocationRequestRepository.save(allocationRequest);
+        notifyRequesterStatusChanged(savedAr, oldStatus);
         if (oldStatus == AllocationRequestStatus.APPROVED && savedAr.getStatus() == AllocationRequestStatus.EXPORT_SLIP_CREATED) {
             ensureStockIssueForExportSlip(savedAr.getId());
             applyAllocationPhysicalIssue(savedAr.getId());
@@ -995,6 +1022,7 @@ public class AllocationRequestService {
                     existingAllocationRequest.getRejectionReason()
                 );
                 AllocationRequest saved = allocationRequestRepository.save(existingAllocationRequest);
+                notifyRequesterStatusChanged(saved, oldStatus);
                 if (oldStatus == AllocationRequestStatus.APPROVED && saved.getStatus() == AllocationRequestStatus.EXPORT_SLIP_CREATED) {
                     ensureStockIssueForExportSlip(saved.getId());
                     applyAllocationPhysicalIssue(saved.getId());
@@ -1114,5 +1142,32 @@ public class AllocationRequestService {
                 throw new BadRequestAlertException("Cần nhập lý do từ chối", ENTITY_NAME, "rejectionreason");
             }
         }
+    }
+
+    private void notifyRequesterStatusChanged(AllocationRequest saved, AllocationRequestStatus oldStatus) {
+        if (saved == null || saved.getRequester() == null || saved.getRequester().getId() == null) {
+            return;
+        }
+        AllocationRequestStatus newStatus = saved.getStatus();
+        if (newStatus == null || oldStatus == newStatus) {
+            return;
+        }
+        String statusLabel = switch (newStatus) {
+            case APPROVED -> "Đã duyệt";
+            case REJECTED -> "Đã từ chối";
+            case EXPORT_SLIP_CREATED -> "Đã tạo phiếu xuất";
+            case COMPLETED -> "Hoàn thành";
+            case CANCELLED -> "Đã hủy";
+            default -> null;
+        };
+        if (statusLabel == null) return;
+        String code = saved.getCode() != null ? saved.getCode() : ("#" + saved.getId());
+        appNotificationService.pushForEmployeeId(
+            saved.getRequester().getId(),
+            "Cập nhật yêu cầu cấp phát",
+            "Yêu cầu " + code + " chuyển trạng thái: " + statusLabel + ".",
+            newStatus == AllocationRequestStatus.REJECTED ? "warning" : "info",
+            "/employee/allocation-requests"
+        );
     }
 }

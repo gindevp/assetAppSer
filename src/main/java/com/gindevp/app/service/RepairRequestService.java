@@ -16,6 +16,7 @@ import com.gindevp.app.repository.EmployeeRepository;
 import com.gindevp.app.repository.EquipmentAssignmentRepository;
 import com.gindevp.app.repository.EquipmentRepository;
 import com.gindevp.app.repository.RepairRequestRepository;
+import com.gindevp.app.security.AuthoritiesConstants;
 import com.gindevp.app.service.dto.RepairRequestDTO;
 import com.gindevp.app.service.dto.RepairRequestLineDTO;
 import com.gindevp.app.service.mapper.RepairRequestLineMapper;
@@ -70,6 +71,16 @@ public class RepairRequestService {
     private final AppAuditLogService appAuditLogService;
 
     private final EquipmentRepairReturnEligibilityService equipmentRepairReturnEligibilityService;
+    private final AppNotificationService appNotificationService;
+
+    private static String employeeDisplayName(Employee e) {
+        if (e == null) return "nhân viên";
+        String name = e.getFullName() != null ? e.getFullName().trim() : "";
+        if (!name.isBlank()) return name;
+        String code = e.getCode() != null ? e.getCode().trim() : "";
+        if (!code.isBlank()) return code;
+        return e.getId() != null ? ("#" + e.getId()) : "nhân viên";
+    }
 
     public RepairRequestService(
         RepairRequestRepository repairRequestRepository,
@@ -83,7 +94,8 @@ public class RepairRequestService {
         EmployeeRepository employeeRepository,
         CurrentEmployeeService currentEmployeeService,
         AppAuditLogService appAuditLogService,
-        EquipmentRepairReturnEligibilityService equipmentRepairReturnEligibilityService
+        EquipmentRepairReturnEligibilityService equipmentRepairReturnEligibilityService,
+        AppNotificationService appNotificationService
     ) {
         this.repairRequestRepository = repairRequestRepository;
         this.repairRequestMapper = repairRequestMapper;
@@ -97,6 +109,7 @@ public class RepairRequestService {
         this.currentEmployeeService = currentEmployeeService;
         this.appAuditLogService = appAuditLogService;
         this.equipmentRepairReturnEligibilityService = equipmentRepairReturnEligibilityService;
+        this.appNotificationService = appNotificationService;
     }
 
     public RepairRequestDTO save(RepairRequestDTO repairRequestDTO) {
@@ -119,6 +132,20 @@ public class RepairRequestService {
         syncRepairLinesFromDtos(repairRequest, lineDtos);
         RepairRequestStatus old = RepairRequestStatus.NEW;
         repairRequest = repairRequestRepository.save(repairRequest);
+        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+            String code = repairRequest.getCode() != null ? repairRequest.getCode() : ("#" + repairRequest.getId());
+            Long requesterId = repairRequest.getRequester() != null ? repairRequest.getRequester().getId() : null;
+            Employee requester = requesterId != null ? employeeRepository.findById(requesterId).orElse(null) : null;
+            appNotificationService.pushForAuthorities(
+                "Yêu cầu sửa chữa mới",
+                "Có yêu cầu sửa chữa mới từ " + employeeDisplayName(requester) + ": " + code + ".",
+                "info",
+                "/admin/repair-requests",
+                AuthoritiesConstants.ASSET_MANAGER,
+                AuthoritiesConstants.ADMIN,
+                AuthoritiesConstants.GD
+            );
+        }
         RepairRequest forLifecycle = repairRequestRepository
             .findOneWithEagerRelationships(repairRequest.getId())
             .orElse(repairRequest);

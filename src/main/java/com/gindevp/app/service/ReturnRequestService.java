@@ -6,6 +6,7 @@ import com.gindevp.app.domain.enumeration.EquipmentOperationalStatus;
 import com.gindevp.app.domain.enumeration.ReturnDisposition;
 import com.gindevp.app.domain.enumeration.ReturnRequestStatus;
 import com.gindevp.app.repository.*;
+import com.gindevp.app.security.AuthoritiesConstants;
 import com.gindevp.app.service.dto.ReturnRequestDTO;
 import com.gindevp.app.service.mapper.ReturnRequestMapper;
 import com.gindevp.app.web.rest.errors.BadRequestAlertException;
@@ -31,6 +32,15 @@ public class ReturnRequestService {
 
     private static final String ENTITY_NAME = "returnRequest";
 
+    private static String employeeDisplayName(Employee e) {
+        if (e == null) return "nhân viên";
+        String name = e.getFullName() != null ? e.getFullName().trim() : "";
+        if (!name.isBlank()) return name;
+        String code = e.getCode() != null ? e.getCode().trim() : "";
+        if (!code.isBlank()) return code;
+        return e.getId() != null ? ("#" + e.getId()) : "nhân viên";
+    }
+
     private final ReturnRequestRepository returnRequestRepository;
 
     private final ReturnRequestMapper returnRequestMapper;
@@ -50,6 +60,7 @@ public class ReturnRequestService {
     private final CurrentEmployeeService currentEmployeeService;
 
     private final AppAuditLogService appAuditLogService;
+    private final AppNotificationService appNotificationService;
 
     public ReturnRequestService(
         ReturnRequestRepository returnRequestRepository,
@@ -61,7 +72,8 @@ public class ReturnRequestService {
         ConsumableStockRepository consumableStockRepository,
         EmployeeRepository employeeRepository,
         CurrentEmployeeService currentEmployeeService,
-        AppAuditLogService appAuditLogService
+        AppAuditLogService appAuditLogService,
+        AppNotificationService appNotificationService
     ) {
         this.returnRequestRepository = returnRequestRepository;
         this.returnRequestMapper = returnRequestMapper;
@@ -73,6 +85,7 @@ public class ReturnRequestService {
         this.employeeRepository = employeeRepository;
         this.currentEmployeeService = currentEmployeeService;
         this.appAuditLogService = appAuditLogService;
+        this.appNotificationService = appNotificationService;
     }
 
     public ReturnRequestDTO save(ReturnRequestDTO returnRequestDTO) {
@@ -100,6 +113,20 @@ public class ReturnRequestService {
         }
         ReturnRequest returnRequest = returnRequestMapper.toEntity(returnRequestDTO);
         returnRequest = returnRequestRepository.save(returnRequest);
+        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+            String code = returnRequest.getCode() != null ? returnRequest.getCode() : ("#" + returnRequest.getId());
+            Long requesterId = returnRequest.getRequester() != null ? returnRequest.getRequester().getId() : null;
+            Employee requester = requesterId != null ? employeeRepository.findById(requesterId).orElse(null) : null;
+            appNotificationService.pushForAuthorities(
+                "Yêu cầu thu hồi mới",
+                "Có yêu cầu thu hồi mới từ " + employeeDisplayName(requester) + ": " + code + ".",
+                "info",
+                "/admin/return-requests",
+                AuthoritiesConstants.ASSET_MANAGER,
+                AuthoritiesConstants.ADMIN,
+                AuthoritiesConstants.GD
+            );
+        }
         return returnRequestMapper.toDto(returnRequest);
     }
 

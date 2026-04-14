@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260414170000-1" author="app">
+        <createTable tableName="app_notification">
+            <column name="id" type="bigint" autoIncrement="${autoIncrement}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="recipient_login" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="message" type="varchar(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kind" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="route" type="varchar(500)"/>
+            <column name="is_read" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="${datetimeType}">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="app_notification" indexName="idx_app_notification_recipient_created">
+            <column name="recipient_login"/>
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

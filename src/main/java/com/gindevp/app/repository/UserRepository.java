@@ -2,6 +2,7 @@ package com.gindevp.app.repository;
 
 import com.gindevp.app.domain.User;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.*;
@@ -29,4 +30,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findAllByIdNotNullAndActivatedIsTrue(Pageable pageable);
 
     Optional<User> findOneByEmployee_Id(Long employeeId);
+
+    List<User> findDistinctByActivatedIsTrueAndAuthorities_NameIn(Collection<String> authorities);
 }

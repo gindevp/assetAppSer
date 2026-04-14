@@ -57,6 +57,18 @@ public class RequestRealtimeService {
         }
     }
 
+    public void publishNotificationChange() {
+        var payload = Map.of("ts", Instant.now().toString());
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("notification-change").data(payload));
+            } catch (Exception ex) {
+                emitters.remove(emitter);
+                LOG.debug("Remove broken realtime emitter: {}", ex.getMessage());
+            }
+        }
+    }
+
     private static boolean isRequestMutation(String method, String uriPath, int status) {
         if (uriPath == null || status >= 400) {
             return false;
