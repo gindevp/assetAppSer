@@ -13,10 +13,11 @@ import org.mapstruct.*;
 /**
  * Mapper for the entity {@link RepairRequest} and its DTO {@link RepairRequestDTO}.
  */
-@Mapper(componentModel = "spring", uses = { RepairRequestLineMapper.class })
+@Mapper(componentModel = "spring", uses = { RepairRequestLineMapper.class, LocationMapper.class })
 public interface RepairRequestMapper extends EntityMapper<RepairRequestDTO, RepairRequest> {
     @Mapping(target = "requester", source = "requester", qualifiedByName = "employeeFullName")
     @Mapping(target = "equipment", source = "equipment", qualifiedByName = "equipmentEquipmentCode")
+    @Mapping(target = "reportedLocation", source = "reportedLocation")
     @Mapping(target = "lines", source = "lines")
     RepairRequestDTO toDto(RepairRequest s);
 

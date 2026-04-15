@@ -74,6 +74,16 @@ public class RepairRequest implements Serializable {
     @JsonIgnoreProperties(value = { "assetItem", "supplier" }, allowSetters = true)
     private Equipment equipment;
 
+    /**
+     * Báo sửa tài sản công ty theo vị trí — NV không chọn serial; QLTS gán thiết bị sau (theo ảnh/mô tả).
+     */
+    @Column(name = "company_site_report", nullable = false)
+    private Boolean companySiteReport = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties(allowSetters = true)
+    private Location reportedLocation;
+
     @OneToMany(mappedBy = "repairRequest", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties(value = { "repairRequest" }, allowSetters = true)
     @OrderBy("lineNo ASC")
@@ -230,6 +240,22 @@ public class RepairRequest implements Serializable {
     public RepairRequest equipment(Equipment equipment) {
         this.setEquipment(equipment);
         return this;
+    }
+
+    public Boolean getCompanySiteReport() {
+        return companySiteReport;
+    }
+
+    public void setCompanySiteReport(Boolean companySiteReport) {
+        this.companySiteReport = companySiteReport != null ? companySiteReport : false;
+    }
+
+    public Location getReportedLocation() {
+        return reportedLocation;
+    }
+
+    public void setReportedLocation(Location reportedLocation) {
+        this.reportedLocation = reportedLocation;
     }
 
     public List<RepairRequestLine> getLines() {

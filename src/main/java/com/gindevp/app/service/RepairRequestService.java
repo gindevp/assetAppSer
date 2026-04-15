@@ -3,6 +3,7 @@ package com.gindevp.app.service;
 import com.gindevp.app.domain.ConsumableAssignment;
 import com.gindevp.app.domain.Employee;
 import com.gindevp.app.domain.Equipment;
+import com.gindevp.app.domain.EquipmentAssignment;
 import com.gindevp.app.domain.RepairRequest;
 import com.gindevp.app.domain.RepairRequestLine;
 import com.gindevp.app.domain.enumeration.AssetManagementType;
@@ -15,6 +16,7 @@ import com.gindevp.app.repository.ConsumableStockRepository;
 import com.gindevp.app.repository.EmployeeRepository;
 import com.gindevp.app.repository.EquipmentAssignmentRepository;
 import com.gindevp.app.repository.EquipmentRepository;
+import com.gindevp.app.repository.LocationRepository;
 import com.gindevp.app.repository.RepairRequestRepository;
 import com.gindevp.app.security.AuthoritiesConstants;
 import com.gindevp.app.service.dto.RepairRequestDTO;
@@ -66,6 +68,8 @@ public class RepairRequestService {
 
     private final EmployeeRepository employeeRepository;
 
+    private final LocationRepository locationRepository;
+
     private final CurrentEmployeeService currentEmployeeService;
 
     private final AppAuditLogService appAuditLogService;
@@ -92,6 +96,7 @@ public class RepairRequestService {
         ConsumableAssignmentRepository consumableAssignmentRepository,
         ConsumableStockRepository consumableStockRepository,
         EmployeeRepository employeeRepository,
+        LocationRepository locationRepository,
         CurrentEmployeeService currentEmployeeService,
         AppAuditLogService appAuditLogService,
         EquipmentRepairReturnEligibilityService equipmentRepairReturnEligibilityService,
@@ -106,6 +111,7 @@ public class RepairRequestService {
         this.consumableAssignmentRepository = consumableAssignmentRepository;
         this.consumableStockRepository = consumableStockRepository;
         this.employeeRepository = employeeRepository;
+        this.locationRepository = locationRepository;
         this.currentEmployeeService = currentEmployeeService;
         this.appAuditLogService = appAuditLogService;
         this.equipmentRepairReturnEligibilityService = equipmentRepairReturnEligibilityService;
@@ -126,9 +132,47 @@ public class RepairRequestService {
                 throw new AccessDeniedException("Chỉ được tạo yêu cầu sửa chữa thay mặt nhân viên đã đăng nhập");
             }
         }
+        boolean companySite = Boolean.TRUE.equals(repairRequestDTO.getCompanySiteReport());
         List<RepairRequestLineDTO> lineDtos = resolveLineDtos(repairRequestDTO, null);
-        validateAndAssertEligibility(lineDtos, null);
+        if (companySite) {
+            if (currentEmployeeService.isAssetManagerOrAdmin()) {
+                throw new BadRequestAlertException(
+                    "Báo sửa theo vị trí (tài sản công ty) chỉ tạo từ tài khoản nhân viên",
+                    ENTITY_NAME,
+                    "companysiteemployeeonly"
+                );
+            }
+            if (repairRequestDTO.getReportedLocation() == null || repairRequestDTO.getReportedLocation().getId() == null) {
+                throw new BadRequestAlertException("Chọn vị trí có tài sản công ty cần sửa", ENTITY_NAME, "nolocation");
+            }
+            locationRepository
+                .findById(repairRequestDTO.getReportedLocation().getId())
+                .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy vị trí", ENTITY_NAME, "locationnotfound"));
+            String pc = repairRequestDTO.getProblemCategory() != null ? repairRequestDTO.getProblemCategory().trim() : "";
+            if (pc.isEmpty()) {
+                throw new BadRequestAlertException("Nhập vấn đề / danh mục", ENTITY_NAME, "noproblem");
+            }
+            String desc = repairRequestDTO.getDescription() != null ? repairRequestDTO.getDescription().trim() : "";
+            String att = repairRequestDTO.getAttachmentNote() != null ? repairRequestDTO.getAttachmentNote().trim() : "";
+            if (desc.isEmpty() && att.isEmpty()) {
+                throw new BadRequestAlertException(
+                    "Nhập mô tả chi tiết hoặc đính kèm ảnh / ghi chú file",
+                    ENTITY_NAME,
+                    "nodetail"
+                );
+            }
+            lineDtos = new ArrayList<>();
+        } else {
+            validateAndAssertEligibility(lineDtos, null);
+        }
         RepairRequest repairRequest = repairRequestMapper.toEntity(repairRequestDTO);
+        if (companySite) {
+            repairRequest.setCompanySiteReport(true);
+            repairRequest.setReportedLocation(locationRepository.getReferenceById(repairRequestDTO.getReportedLocation().getId()));
+        } else {
+            repairRequest.setCompanySiteReport(false);
+            repairRequest.setReportedLocation(null);
+        }
         syncRepairLinesFromDtos(repairRequest, lineDtos);
         RepairRequestStatus old = RepairRequestStatus.NEW;
         repairRequest = repairRequestRepository.save(repairRequest);
@@ -165,10 +209,15 @@ public class RepairRequestService {
             .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy yêu cầu sửa chữa", ENTITY_NAME, "notfound"));
         RepairRequestStatus old = entity.getStatus();
         List<RepairRequestLineDTO> lineDtos = resolveLineDtos(repairRequestDTO, entity);
-        validateAndAssertEligibility(lineDtos, repairRequestDTO.getId());
+        boolean permitEmptyCompanyPending =
+            Boolean.TRUE.equals(entity.getCompanySiteReport()) &&
+            old == RepairRequestStatus.NEW &&
+            lineDtos.isEmpty();
+        validateAndAssertEligibility(lineDtos, repairRequestDTO.getId(), permitEmptyCompanyPending);
         repairRequestMapper.partialUpdate(entity, repairRequestDTO);
         syncRepairLinesFromDtos(entity, lineDtos);
         assertRepairStatusTransition(old, entity.getStatus());
+        assertLinesPresentWhenAccepting(entity, old);
         assertRejectionReasonWhenRejected(old, entity.getStatus(), entity.getRejectionReason());
         RepairRequest saved = repairRequestRepository.save(entity);
         RepairRequest forLifecycle = repairRequestRepository.findOneWithEagerRelationships(saved.getId()).orElse(saved);
@@ -180,7 +229,7 @@ public class RepairRequestService {
         LOG.debug("Request to partially update RepairRequest : {}", repairRequestDTO);
         if (!currentEmployeeService.isAssetManagerOrAdmin()) {
             return repairRequestRepository
-                .findById(repairRequestDTO.getId())
+                .findOneWithEagerRelationships(repairRequestDTO.getId())
                 .map(existingRepairRequest -> {
                     Long eid = currentEmployeeService
                         .currentEmployeeId()
@@ -197,11 +246,20 @@ public class RepairRequestService {
                     if (repairRequestDTO.getStatus() != null) {
                         throw new AccessDeniedException("Không đổi trạng thái từ form sửa của nhân viên");
                     }
-                    if (employeeRepairContentPatchHasForbiddenFields(repairRequestDTO)) {
-                        throw new AccessDeniedException("Chỉ được sửa vấn đề, mô tả, ghi chú đính kèm");
+                    if (employeeRepairMetadataPatchHasForbiddenFields(repairRequestDTO)) {
+                        throw new AccessDeniedException(
+                            "Chỉ được sửa vấn đề, mô tả, ghi chú đính kèm và danh sách thiết bị/vật tư (không đổi mã phiếu, người gửi, trạng thái xử lý)"
+                        );
                     }
                     RepairRequestStatus old = existingRepairRequest.getStatus();
+                    List<RepairRequestLineDTO> lineDtos = resolveLineDtos(repairRequestDTO, existingRepairRequest);
+                    if (repairRequestDTO.getLines() != null) {
+                        validateAndAssertEligibility(lineDtos, repairRequestDTO.getId());
+                    }
                     repairRequestMapper.partialUpdate(existingRepairRequest, repairRequestDTO);
+                    if (repairRequestDTO.getLines() != null) {
+                        syncRepairLinesFromDtos(existingRepairRequest, lineDtos);
+                    }
                     RepairRequest saved = repairRequestRepository.save(existingRepairRequest);
                     RepairRequest forLifecycle = repairRequestRepository.findOneWithEagerRelationships(saved.getId()).orElse(saved);
                     applyRepairLifecycle(old, forLifecycle);
@@ -215,10 +273,15 @@ public class RepairRequestService {
             .map(existingRepairRequest -> {
                 RepairRequestStatus old = existingRepairRequest.getStatus();
                 List<RepairRequestLineDTO> lineDtos = resolveLineDtos(repairRequestDTO, existingRepairRequest);
-                validateAndAssertEligibility(lineDtos, repairRequestDTO.getId());
+                boolean permitEmptyCompanyPending =
+                    Boolean.TRUE.equals(existingRepairRequest.getCompanySiteReport()) &&
+                    old == RepairRequestStatus.NEW &&
+                    lineDtos.isEmpty();
+                validateAndAssertEligibility(lineDtos, repairRequestDTO.getId(), permitEmptyCompanyPending);
                 repairRequestMapper.partialUpdate(existingRepairRequest, repairRequestDTO);
                 syncRepairLinesFromDtos(existingRepairRequest, lineDtos);
                 assertRepairStatusTransition(old, existingRepairRequest.getStatus());
+                assertLinesPresentWhenAccepting(existingRepairRequest, old);
                 assertRejectionReasonWhenRejected(old, existingRepairRequest.getStatus(), existingRepairRequest.getRejectionReason());
                 RepairRequest saved = repairRequestRepository.save(existingRepairRequest);
                 RepairRequest forLifecycle = repairRequestRepository.findOneWithEagerRelationships(saved.getId()).orElse(saved);
@@ -231,6 +294,23 @@ public class RepairRequestService {
     /**
      * Luồng: NEW → (ACCEPTED | REJECTED) → IN_PROGRESS (chỉ từ ACCEPTED) → COMPLETED (chỉ từ IN_PROGRESS).
      */
+    /** Khi chuyển sang Đã nhận — phải đã có ít nhất một dòng thiết bị/vật tư (QLTS gán từ ảnh/mô tả). */
+    private void assertLinesPresentWhenAccepting(RepairRequest entity, RepairRequestStatus oldStatus) {
+        if (entity.getStatus() != RepairRequestStatus.ACCEPTED) {
+            return;
+        }
+        if (oldStatus == RepairRequestStatus.ACCEPTED) {
+            return;
+        }
+        if (entity.getLines() == null || entity.getLines().isEmpty()) {
+            throw new BadRequestAlertException(
+                "Chọn thiết bị/vật tư cần sửa (theo hình ảnh mô tả) trước khi tiếp nhận",
+                ENTITY_NAME,
+                "nolinesbeforeaccept"
+            );
+        }
+    }
+
     private static void assertRepairStatusTransition(RepairRequestStatus oldStatus, RepairRequestStatus newStatus) {
         if (newStatus == null || newStatus == oldStatus) {
             return;
@@ -285,17 +365,18 @@ public class RepairRequestService {
                 continue;
             }
             switch (out) {
-                case RETURN_USER -> eq.setStatus(EquipmentOperationalStatus.IN_USE);
+                case RETURN_USER -> applyReturnUserAfterRepair(saved, eqId, eq);
                 case RETURN_STOCK -> {
                     eq.setStatus(EquipmentOperationalStatus.IN_STOCK);
                     closeOpenAssignment(eqId);
+                    equipmentRepository.save(eq);
                 }
                 case MARK_BROKEN -> {
                     eq.setStatus(EquipmentOperationalStatus.BROKEN);
                     closeOpenAssignment(eqId);
+                    equipmentRepository.save(eq);
                 }
             }
-            equipmentRepository.save(eq);
             appAuditLogService.recordBusiness(
                 "REPAIR_COMPLETED",
                 "requestId=" + saved.getId() + " equipmentId=" + eqId + " outcome=" + out
@@ -303,6 +384,34 @@ public class RepairRequestService {
             LOG.debug("Repair completed for equipment {} outcome {}", eqId, out);
         }
         applyConsumableRepairCompletion(saved, out);
+    }
+
+    /**
+     * «Trả lại người dùng»: thiết bị về trạng thái đang sử dụng.
+     * Phiếu báo tài sản công ty theo vị trí: đóng bàn giao mở và tạo bàn giao mới về {@link RepairRequest#getReportedLocation()}
+     * (không gán về nhân viên lập phiếu).
+     */
+    private void applyReturnUserAfterRepair(RepairRequest saved, Long eqId, Equipment eq) {
+        eq.setStatus(EquipmentOperationalStatus.IN_USE);
+        equipmentRepository.save(eq);
+        if (
+            Boolean.TRUE.equals(saved.getCompanySiteReport()) &&
+            saved.getReportedLocation() != null &&
+            saved.getReportedLocation().getId() != null
+        ) {
+            closeOpenAssignment(eqId);
+            EquipmentAssignment a = new EquipmentAssignment();
+            a.setEquipment(equipmentRepository.getReferenceById(eqId));
+            a.setLocation(locationRepository.getReferenceById(saved.getReportedLocation().getId()));
+            a.setAssignedDate(LocalDate.now());
+            a.setNote("Trả về vị trí sau sửa chữa (báo theo vị trí)");
+            equipmentAssignmentRepository.save(a);
+            LOG.debug(
+                "Re-assigned equipment {} to location {} after company-site repair completion",
+                eqId,
+                saved.getReportedLocation().getId()
+            );
+        }
     }
 
     /**
@@ -459,7 +568,14 @@ public class RepairRequestService {
     }
 
     private void validateAndAssertEligibility(List<RepairRequestLineDTO> lines, Long excludeRepairRequestId) {
+        validateAndAssertEligibility(lines, excludeRepairRequestId, false);
+    }
+
+    private void validateAndAssertEligibility(List<RepairRequestLineDTO> lines, Long excludeRepairRequestId, boolean permitEmptyLinesPendingCompanySite) {
         if (lines.isEmpty()) {
+            if (permitEmptyLinesPendingCompanySite) {
+                return;
+            }
             throw new BadRequestAlertException("Cần ít nhất một thiết bị hoặc vật tư", ENTITY_NAME, "nolines");
         }
         List<Long> equipmentIds = new ArrayList<>();
@@ -613,13 +729,13 @@ public class RepairRequestService {
         repairRequestRepository.deleteById(id);
     }
 
-    private static boolean employeeRepairContentPatchHasForbiddenFields(RepairRequestDTO d) {
+    /** Các trường meta / QLTS — nhân viên không được đụng; {@code lines} được xử lý riêng khi sửa phiếu (trạng thái Mới). */
+    private static boolean employeeRepairMetadataPatchHasForbiddenFields(RepairRequestDTO d) {
         return (
             d.getCode() != null ||
             d.getRequestDate() != null ||
             d.getRequester() != null ||
             d.getEquipment() != null ||
-            d.getLines() != null ||
             d.getStatus() != null ||
             d.getResolutionNote() != null ||
             d.getRepairOutcome() != null ||

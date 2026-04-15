@@ -80,6 +80,7 @@
     <include file="config/liquibase/changelog/20260409120000_loss_report_request_context.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260410120000_loss_report_combined.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260414170000_app_notification.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260415180000_repair_request_company_site.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-constraints-changelog - JHipster will add liquibase constraints changelogs here -->
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>

@@ -202,22 +202,6 @@ public class EquipmentRepairReturnEligibilityService {
                     "repairinprogressconsumable"
                 );
             }
-            if (
-                returnRequestLineRepository.existsOpenReturnLineForConsumableAssetItemExcluding(
-                    itemId,
-                    null,
-                    OPEN_RETURN_STATUSES,
-                    AssetManagementType.CONSUMABLE
-                )
-            ) {
-                throw new BadRequestAlertException(
-                    "Vật tư ("
-                        + formatAssetItemRef(itemId)
-                        + ") đang có phiếu thu hồi chưa kết thúc (chờ duyệt hoặc đã duyệt) — không tạo thêm yêu cầu sửa chữa cho cùng mặt hàng.",
-                    ENTITY_REPAIR,
-                    "returnblocksrepairconsumable"
-                );
-            }
         }
     }
 

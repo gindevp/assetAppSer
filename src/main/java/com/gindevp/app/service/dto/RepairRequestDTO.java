@@ -50,6 +50,11 @@ public class RepairRequestDTO implements Serializable {
 
     private EquipmentDTO equipment;
 
+    @Schema(description = "Báo sửa tài sản công ty theo vị trí — không chọn serial; QLTS gán thiết bị sau")
+    private Boolean companySiteReport;
+
+    private LocationDTO reportedLocation;
+
     private List<RepairRequestLineDTO> lines;
 
     public Long getId() {
@@ -146,6 +151,22 @@ public class RepairRequestDTO implements Serializable {
 
     public void setEquipment(EquipmentDTO equipment) {
         this.equipment = equipment;
+    }
+
+    public Boolean getCompanySiteReport() {
+        return companySiteReport;
+    }
+
+    public void setCompanySiteReport(Boolean companySiteReport) {
+        this.companySiteReport = companySiteReport;
+    }
+
+    public LocationDTO getReportedLocation() {
+        return reportedLocation;
+    }
+
+    public void setReportedLocation(LocationDTO reportedLocation) {
+        this.reportedLocation = reportedLocation;
     }
 
     public List<RepairRequestLineDTO> getLines() {

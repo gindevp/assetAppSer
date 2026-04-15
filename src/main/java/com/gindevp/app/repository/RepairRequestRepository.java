@@ -35,6 +35,7 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
             "left join fetch repairRequest.requester req " +
             "left join fetch req.department " +
             "left join fetch repairRequest.equipment " +
+            "left join fetch repairRequest.reportedLocation " +
             "left join fetch repairRequest.lines lines " +
             "left join fetch lines.equipment " +
             "left join fetch lines.equipment.assetItem " +
@@ -48,6 +49,7 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
             "left join fetch repairRequest.requester req " +
             "left join fetch req.department " +
             "left join fetch repairRequest.equipment " +
+            "left join fetch repairRequest.reportedLocation " +
             "left join fetch repairRequest.lines lines " +
             "left join fetch lines.equipment " +
             "left join fetch lines.equipment.assetItem " +
@@ -60,6 +62,7 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
             "left join fetch repairRequest.requester req " +
             "left join fetch req.department " +
             "left join fetch repairRequest.equipment " +
+            "left join fetch repairRequest.reportedLocation " +
             "left join fetch repairRequest.lines lines " +
             "left join fetch lines.equipment " +
             "left join fetch lines.equipment.assetItem " +

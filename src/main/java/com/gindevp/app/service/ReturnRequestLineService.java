@@ -276,13 +276,28 @@ public class ReturnRequestLineService {
 
     public void delete(Long id) {
         LOG.debug("Request to delete ReturnRequestLine : {}", id);
-        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
-            throw new AccessDeniedException("Chỉ QLTS/Admin được xóa dòng thu hồi");
-        }
         ReturnRequestLine existing = returnRequestLineRepository
             .findOneWithEagerRelationships(id)
             .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy dòng thu hồi", ENTITY_NAME, "idnotfound"));
         assertParentReturnRequestOpen(existing);
+
+        if (!currentEmployeeService.isAssetManagerOrAdmin()) {
+            Long eid = currentEmployeeService
+                .currentEmployeeId()
+                .orElseThrow(() -> new AccessDeniedException("Tài khoản chưa liên kết nhân viên"));
+            if (existing.getRequest() == null || existing.getRequest().getId() == null) {
+                throw new BadRequestAlertException("Dòng không gắn phiếu thu hồi", ENTITY_NAME, "norequest");
+            }
+            ReturnRequest rr = returnRequestRepository
+                .findOneWithEagerRelationships(existing.getRequest().getId())
+                .orElseThrow(() -> new BadRequestAlertException("Không tìm thấy yêu cầu thu hồi", ENTITY_NAME, "idnotfound"));
+            if (rr.getRequester() == null || !eid.equals(rr.getRequester().getId())) {
+                throw new AccessDeniedException("Không phải yêu cầu của bạn");
+            }
+            if (rr.getStatus() != ReturnRequestStatus.PENDING) {
+                throw new BadRequestAlertException("Chỉ xóa dòng khi yêu cầu đang chờ duyệt", ENTITY_NAME, "notpending");
+            }
+        }
         returnRequestLineRepository.deleteById(id);
     }
 
