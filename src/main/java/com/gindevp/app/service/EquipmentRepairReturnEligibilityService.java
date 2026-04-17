@@ -237,22 +237,9 @@ public class EquipmentRepairReturnEligibilityService {
                 );
             }
         }
-        if (
-            returnRequestLineRepository.existsOpenReturnLineForConsumableAssetItemExcluding(
-                assetItemId,
-                returnRequestId,
-                OPEN_RETURN_STATUSES,
-                AssetManagementType.CONSUMABLE
-            )
-        ) {
-            throw new BadRequestAlertException(
-                "Vật tư ("
-                    + formatAssetItemRef(assetItemId)
-                    + ") đã có trên phiếu thu hồi khác chưa kết thúc (chờ duyệt hoặc đã duyệt) — không thêm cùng mặt hàng vào phiếu này.",
-                ENTITY_RETURN_LINE,
-                "otheropenreturnconsumable"
-            );
-        }
+        // Cho phép cùng mặt hàng xuất hiện trên nhiều phiếu thu hồi mở.
+        // Giới hạn số lượng còn khả dụng được kiểm soát ở ReturnRequestLineService (consumableHeldForRequester)
+        // và FE đã trừ pending theo từng phiếu.
         if (
             repairRequestRepository.existsActiveRepairForAssetItemExcluding(assetItemId, null, OPEN_REPAIR_STATUSES, AssetManagementType.CONSUMABLE)
         ) {
