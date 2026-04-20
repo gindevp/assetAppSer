@@ -15,6 +15,8 @@ public class ApplicationProperties {
 
     private final Upload upload = new Upload();
 
+    private final Mail mail = new Mail();
+
     // jhipster-needle-application-properties-property
 
     public Liquibase getLiquibase() {
@@ -23,6 +25,26 @@ public class ApplicationProperties {
 
     public Upload getUpload() {
         return upload;
+    }
+
+    public Mail getMail() {
+        return mail;
+    }
+
+    public static class Mail {
+
+        /**
+         * Khi true: không gửi qua SMTP, chỉ log (dev không cấu mail vẫn chạy được).
+         */
+        private boolean dryRun = false;
+
+        public boolean isDryRun() {
+            return dryRun;
+        }
+
+        public void setDryRun(boolean dryRun) {
+            this.dryRun = dryRun;
+        }
     }
 
     public static class Upload {

@@ -51,20 +51,20 @@ spring:
       mode: always
       continue-on-error: true
       schema-locations: classpath:config/sql/00_clear_liquibase_lock.sql
-  # Gmail: đặt biến môi trường (không commit mật khẩu). Thêm: SPRING_MAIL_SMTP_AUTH=true SPRING_MAIL_SMTP_STARTTLS=true
-  # Ví dụ: SPRING_MAIL_HOST=smtp.gmail.com SPRING_MAIL_PORT=587 SPRING_MAIL_USERNAME=...@gmail.com SPRING_MAIL_PASSWORD=app-password (16 ký tự, bỏ dấu cách)
+  # Gmail: bắt buộc SPRING_MAIL_USERNAME và SPRING_MAIL_PASSWORD (App Password 16 ký tự, không commit vào git).
+  # Không chạy SMTP local: không dùng localhost:25 (Connection refused). Mặc định: smtp.gmail.com:587 + STARTTLS.
   mail:
-    host: ${SPRING_MAIL_HOST:localhost}
-    port: ${SPRING_MAIL_PORT:25}
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
     username: ${SPRING_MAIL_USERNAME:}
     password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: ${SPRING_MAIL_SMTP_AUTH:false}
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
           starttls:
-            enable: ${SPRING_MAIL_SMTP_STARTTLS:false}
-            required: ${SPRING_MAIL_SMTP_STARTTLS:false}
+            enable: ${SPRING_MAIL_SMTP_STARTTLS:true}
+            required: ${SPRING_MAIL_SMTP_STARTTLS:true}
   messages:
     cache-duration: PT1S # 1 second, see the ISO 8601 standard
   thymeleaf:
@@ -110,6 +110,9 @@ application:
   liquibase:
     # Run synchronously in dev to avoid partial schema during startup/restart
     async-start: false
+  mail:
+    # false: gửi mail qua Gmail (cần spring.mail.username/password). true: chỉ log, không SMTP — khi chưa cấu mail.
+    dry-run: ${APP_MAIL_DRY_RUN:false}
   logging:
     use-json-format: false # By default, logs are not in Json format
     logstash: # Forward logs to logstash over a socket, used by LoggingConfiguration

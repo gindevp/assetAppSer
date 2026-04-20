@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
+import com.gindevp.app.config.ApplicationProperties;
 import tech.jhipster.config.JHipsterProperties;
 
 /**
@@ -33,6 +34,8 @@ public class MailService {
 
     private final JHipsterProperties jHipsterProperties;
 
+    private final ApplicationProperties applicationProperties;
+
     private final JavaMailSender javaMailSender;
 
     private final MessageSource messageSource;
@@ -41,11 +44,13 @@ public class MailService {
 
     public MailService(
         JHipsterProperties jHipsterProperties,
+        ApplicationProperties applicationProperties,
         JavaMailSender javaMailSender,
         MessageSource messageSource,
         SpringTemplateEngine templateEngine
     ) {
         this.jHipsterProperties = jHipsterProperties;
+        this.applicationProperties = applicationProperties;
         this.javaMailSender = javaMailSender;
         this.messageSource = messageSource;
         this.templateEngine = templateEngine;
@@ -65,6 +70,16 @@ public class MailService {
             subject,
             content
         );
+
+        if (applicationProperties.getMail().isDryRun()) {
+            LOG.info(
+                "[mail dry-run] Skipping SMTP; would send to '{}' subject '{}' (html={})",
+                to,
+                subject,
+                isHtml
+            );
+            return;
+        }
 
         // Prepare message using a Spring helper
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
