@@ -42,7 +42,10 @@
     -->
     <changeSet id="20260328142639-1-data" author="jhipster" context="faker">
         <preConditions onFail="MARK_RAN">
-            <tableExists tableName="asset_type"/>
+            <and>
+                <tableExists tableName="asset_type"/>
+                <sqlCheck expectedResult="0">SELECT COUNT(*) FROM asset_type</sqlCheck>
+            </and>
         </preConditions>
         <loadData
                   file="config/liquibase/fake-data/asset_type.csv"

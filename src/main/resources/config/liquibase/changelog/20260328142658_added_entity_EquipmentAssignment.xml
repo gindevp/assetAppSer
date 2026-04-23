@@ -50,6 +50,9 @@
           Spring Boot configuration key.
     -->
     <changeSet id="20260328142658-1-data" author="jhipster" context="faker">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM equipment_assignment</sqlCheck>
+        </preConditions>
         <loadData
                   file="config/liquibase/fake-data/equipment_assignment.csv"
                   separator=";"
